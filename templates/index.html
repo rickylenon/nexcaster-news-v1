@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexcaster News Report Generator</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+        }
+        .upload-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            resize: vertical;
+            min-height: 120px;
+            box-sizing: border-box;
+        }
+        .file-upload-container {
+            position: relative;
+            width: 100%;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+            z-index: 1;
+        }
+        .file-upload-container:hover {
+            border-color: #667eea;
+            background: #f0f2ff;
+        }
+        .file-upload-container.dragover {
+            border-color: #667eea;
+            background: #e6ebff;
+            transform: scale(1.02);
+        }
+        .file-upload-container input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .new-media-files {
+            position: relative !important;
+            opacity: 1 !important;
+            width: 100% !important;
+            height: auto !important;
+            padding: 8px !important;
+            border: 1px solid #ddd !important;
+            border-radius: 4px !important;
+            font-size: 12px !important;
+        }
+        .file-upload-info {
+            pointer-events: none;
+        }
+        .file-upload-info p {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: #333;
+        }
+        .file-upload-info small {
+            display: block;
+            color: #666;
+            margin: 5px 0;
+        }
+        .file-preview {
+            margin-top: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .file-preview-item {
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 12px;
+            position: relative;
+        }
+        .file-preview-item.image {
+            border-left: 4px solid #28a745;
+        }
+        .file-preview-item.video {
+            border-left: 4px solid #007bff;
+        }
+        .file-preview-item.oversized {
+            border-color: #dc3545;
+            background: #fff5f5;
+        }
+        .file-preview-item .file-name {
+            margin-left: 8px;
+            color: #333;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .file-preview-item .file-size {
+            margin-left: auto;
+            color: #666;
+            font-weight: normal;
+        }
+        .file-preview-item .remove-file {
+            margin-left: 8px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .upload-progress {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        .upload-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        input[type="url"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: transform 0.2s;
+            margin-right: 10px;
+            position: relative;
+            z-index: 10;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+        }
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        .links-container {
+            margin-top: 10px;
+        }
+        .link-input {
+            display: flex;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+        .link-input input {
+            flex: 1;
+        }
+        .add-link-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .news-list {
+            margin-top: 30px;
+        }
+        .news-item {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 5;
+        }
+        .news-item.editing {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        .news-content {
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        .news-content-display {
+            white-space: pre-wrap;
+        }
+        .news-content-edit {
+            display: none;
+        }
+        .news-item.editing .news-content-display {
+            display: none;
+        }
+        .news-item.editing .news-content-edit {
+            display: block;
+        }
+        .edit-textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        .media-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .media-item {
+            background: #e9ecef;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #495057;
+            position: relative;
+        }
+        .media-item a {
+            color: #495057;
+            text-decoration: none;
+        }
+        .media-item a:hover {
+            text-decoration: underline;
+        }
+        .timestamp {
+            font-size: 12px;
+            color: #6c757d;
+            margin-bottom: 10px;
+        }
+        .news-item-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .edit-actions {
+            display: none;
+        }
+        .news-item.editing .edit-actions {
+            display: flex;
+        }
+        .news-item.editing .default-actions {
+            display: none;
+        }
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+        .flash-message {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+        .flash-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .flash-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .file-validation-error {
+            color: #dc3545;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .upload-stats {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .media-section {
+            margin-bottom: 15px;
+        }
+        .media-list-display {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .news-item.editing .media-list-display {
+            display: none;
+        }
+        .news-item.editing .media-list-edit {
+            display: block !important;
+        }
+        .edit-media-container {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+        .edit-media-container h4 {
+            margin: 0 0 15px 0;
+            color: #333;
+            font-size: 14px;
+        }
+        .existing-media {
+            margin-bottom: 15px;
+        }
+        .editable-media-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin-bottom: 5px;
+        }
+        .editable-media-item.image {
+            border-left: 4px solid #28a745;
+        }
+        .editable-media-item.video {
+            border-left: 4px solid #007bff;
+        }
+        .editable-media-item.link {
+            border-left: 4px solid #6c757d;
+        }
+        .edit-link-input {
+            flex: 1;
+            margin-right: 10px;
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .add-new-media, .add-new-links {
+            margin-bottom: 15px;
+        }
+        .add-new-media label, .add-new-links label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .new-file-preview {
+            margin-top: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .new-file-preview-item {
+            background: #e9ecef;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .new-links-container .link-input {
+            margin-bottom: 5px;
+        }
+        .new-link-input {
+            flex: 1;
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📺 Nexcaster News Report Generator</h1>
+            <p>Upload news content and media to generate professional news reports</p>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Upload Form -->
+        <div class="upload-section">
+            <h2>📝 Add News Content</h2>
+            <form method="POST" action="/upload" enctype="multipart/form-data" id="upload-form">
+                <div class="form-group">
+                    <label for="news_context">News Context:</label>
+                    <textarea name="news_context" id="news_context" 
+                              placeholder="Enter the news context, event details, and any relevant information..." 
+                              required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="media_files">Media Files (Images/Videos):</label>
+                    <div class="file-upload-container">
+                        <input type="file" name="media_files" id="media_files" 
+                               multiple accept=".png,.jpg,.jpeg,.gif,.bmp,.webp,.mp4,.avi,.mov,.webm,.mkv,.flv"
+                               onchange="handleFileSelection(this)">
+                        <div class="file-upload-info">
+                            <p>📁 Drop files here or click to select</p>
+                            <small>Supported: PNG, JPG, JPEG, GIF, BMP, WEBP, MP4, AVI, MOV, WEBM, MKV, FLV</small>
+                            <small>Max size per file: 50MB</small>
+                        </div>
+                    </div>
+                    <div id="file-preview" class="file-preview"></div>
+                    <div id="file-validation-errors" class="file-validation-error"></div>
+                    <div id="upload-stats" class="upload-stats" style="display: none;"></div>
+                    <div id="upload-progress" class="upload-progress" style="display: none;">
+                        <div class="upload-progress-bar"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Media Links:</label>
+                    <div id="links-container">
+                        <div class="link-input">
+                            <input type="url" name="links" placeholder="https://example.com/image.jpg">
+                            <button type="button" class="add-link-btn" onclick="addLinkInput(event)">+ Add Link</button>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn" id="upload-btn">📤 Upload News Content</button>
+            </form>
+        </div>
+
+        <!-- News List -->
+        <div class="news-list">
+            <h2>📄 Uploaded News Content ({{ news_data|length }} items)</h2>
+            {% if news_data %}
+                {% for news_item in news_data %}
+                    <div class="news-item" id="news-item-{{ loop.index0 }}">
+                        {% if news_item.timestamp %}
+                            <div class="timestamp">📅 {{ news_item.timestamp }}</div>
+                        {% endif %}
+                        
+                        <div class="news-content">
+                            <strong>News Context:</strong><br>
+                            <div class="news-content-display">{{ news_item.news }}</div>
+                            <div class="news-content-edit">
+                                <textarea class="edit-textarea" id="edit-content-{{ loop.index0 }}">{{ news_item.news }}</textarea>
+                            </div>
+                        </div>
+
+                        {% if news_item.media %}
+                            <div class="media-section">
+                                <div class="media-list-display">
+                                    {% for media in news_item.media %}
+                                        {% if media.image %}
+                                            <span class="media-item image" data-media-id="{{ media.image }}">
+                                                🖼️ {{ media.get('original_name', media.image) }}
+                                                {% if media.get('size_mb') %}
+                                                    <small>({{ media.size_mb }}MB)</small>
+                                                {% endif %}
+                                            </span>
+                                        {% elif media.video %}
+                                            <span class="media-item video" data-media-id="{{ media.video }}">
+                                                🎥 {{ media.get('original_name', media.video) }}
+                                                {% if media.get('size_mb') %}
+                                                    <small>({{ media.size_mb }}MB)</small>
+                                                {% endif %}
+                                            </span>
+                                        {% elif media.link %}
+                                            <span class="media-item link" data-media-link="{{ media.link }}">
+                                                🔗 <a href="{{ media.link }}" target="_blank">{{ media.link }}</a>
+                                            </span>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                
+                                <div class="media-list-edit" style="display: none;">
+                                    <div class="edit-media-container" id="edit-media-{{ loop.index0 }}">
+                                        <h4>📎 Edit Media Files:</h4>
+                                        
+                                        <!-- Existing Media -->
+                                        <div class="existing-media">
+                                            {% for media in news_item.media %}
+                                                {% if media.image %}
+                                                    <div class="editable-media-item image" data-media-id="{{ media.image }}">
+                                                        <span>🖼️ {{ media.get('original_name', media.image) }}</span>
+                                                        <button type="button" class="btn btn-danger btn-small" onclick="removeMediaItem({{ loop.index0 }}, '{{ media.image }}', this, event)">
+                                                            🗑️ Remove
+                                                        </button>
+                                                    </div>
+                                                {% elif media.video %}
+                                                    <div class="editable-media-item video" data-media-id="{{ media.video }}">
+                                                        <span>🎥 {{ media.get('original_name', media.video) }}</span>
+                                                        <button type="button" class="btn btn-danger btn-small" onclick="removeMediaItem({{ loop.index0 }}, '{{ media.video }}', this, event)">
+                                                            🗑️ Remove
+                                                        </button>
+                                                    </div>
+                                                {% elif media.link %}
+                                                    <div class="editable-media-item link" data-media-link="{{ media.link }}">
+                                                        <input type="url" value="{{ media.link }}" class="edit-link-input" placeholder="https://example.com/image.jpg">
+                                                        <button type="button" class="btn btn-danger btn-small" onclick="removeLinkItem(this, event)">
+                                                            🗑️ Remove
+                                                        </button>
+                                                    </div>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                        
+                                        <!-- Add New Files -->
+                                        <div class="add-new-media">
+                                            <label>Add New Files:</label>
+                                            <input type="file" multiple accept=".png,.jpg,.jpeg,.gif,.bmp,.webp,.mp4,.avi,.mov,.webm,.mkv,.flv" 
+                                                   class="new-media-files" id="new-media-{{ loop.index0 }}">
+                                            <div class="new-file-preview" id="new-preview-{{ loop.index0 }}"></div>
+                                        </div>
+                                        
+                                        <!-- Add New Links -->
+                                        <div class="add-new-links">
+                                            <label>Add New Links:</label>
+                                            <div class="new-links-container" id="new-links-{{ loop.index0 }}">
+                                                <div class="link-input">
+                                                    <input type="url" class="new-link-input" placeholder="https://example.com/image.jpg">
+                                                    <button type="button" class="btn btn-success btn-small" onclick="addNewLinkToEdit({{ loop.index0 }}, event)">+ Add</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        {% if news_item.upload_summary %}
+                            <div class="upload-summary">
+                                <small style="color: #666;">
+                                    📊 Upload Summary: {{ news_item.upload_summary.successful_uploads }} files uploaded
+                                    ({{ news_item.upload_summary.images }} images, {{ news_item.upload_summary.videos }} videos)
+                                    {% if news_item.upload_summary.failed_uploads > 0 %}
+                                        | {{ news_item.upload_summary.failed_uploads }} failed
+                                    {% endif %}
+                                </small>
+                            </div>
+                        {% endif %}
+
+                        <div class="news-item-actions">
+                            <div class="default-actions">
+                                <button type="button" class="btn btn-secondary btn-small" onclick="editNewsItem({{ loop.index0 }}, event)">
+                                    ✏️ Edit
+                                </button>
+                                <form method="POST" action="/delete-news/{{ loop.index0 }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-danger btn-small" 
+                                            onclick="return confirm('Are you sure you want to delete this news item?')">
+                                        🗑️ Delete
+                                    </button>
+                                </form>
+                            </div>
+                            
+                            <div class="edit-actions">
+                                <button type="button" class="btn btn-success btn-small" onclick="saveNewsItem({{ loop.index0 }}, event)">
+                                    💾 Save
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-small" onclick="cancelEdit({{ loop.index0 }}, event)">
+                                    ❌ Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="news-item">
+                    <p style="text-align: center; color: #666;">No news content uploaded yet. Start by adding your first news item above!</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        // Global variables for file management
+        let selectedFiles = [];
+        let validationErrors = [];
+
+        function addLinkInput(event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
+            const container = document.getElementById('links-container');
+            const newLinkDiv = document.createElement('div');
+            newLinkDiv.className = 'link-input';
+            newLinkDiv.innerHTML = `
+                <input type="url" name="links" placeholder="https://example.com/image.jpg">
+                <button type="button" class="btn btn-danger btn-small" onclick="removeLinkInput(this, event)">Remove</button>
+            `;
+            container.appendChild(newLinkDiv);
+        }
+
+        function removeLinkInput(button, event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            button.parentElement.remove();
+        }
+
+        // Auto-resize textarea
+        document.getElementById('news_context').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = this.scrollHeight + 'px';
+        });
+
+        // Enhanced file upload functionality
+        function handleFileSelection(input) {
+            selectedFiles = Array.from(input.files);
+            validateAndDisplayFiles();
+        }
+
+        function validateAndDisplayFiles() {
+            validationErrors = [];
+            const preview = document.getElementById('file-preview');
+            const errorDiv = document.getElementById('file-validation-errors');
+            const statsDiv = document.getElementById('upload-stats');
+            
+            preview.innerHTML = '';
+            errorDiv.innerHTML = '';
+
+            if (selectedFiles.length === 0) {
+                statsDiv.style.display = 'none';
+                return;
+            }
+
+            let totalSize = 0;
+            let imageCount = 0;
+            let videoCount = 0;
+            let validFiles = 0;
+
+            selectedFiles.forEach((file, index) => {
+                const fileSize = file.size / (1024 * 1024); // MB
+                const fileType = getFileType(file.name);
+                totalSize += fileSize;
+
+                if (fileType === 'image') imageCount++;
+                else if (fileType === 'video') videoCount++;
+
+                // Validation
+                const isValid = validateFile(file, index);
+                if (isValid) validFiles++;
+
+                // Create preview item
+                const previewItem = document.createElement('div');
+                previewItem.className = `file-preview-item ${fileType}`;
+                if (fileSize > 50) previewItem.classList.add('oversized');
+                
+                const icon = fileType === 'image' ? '🖼️' : '🎥';
+                const sizeColor = fileSize > 50 ? 'color: red; font-weight: bold;' : '';
+                
+                previewItem.innerHTML = `
+                    <span>${icon}</span>
+                    <span class="file-name" title="${file.name}">${file.name}</span>
+                    <span class="file-size" style="${sizeColor}">${fileSize.toFixed(2)}MB</span>
+                    <button type="button" class="remove-file" onclick="removeFile(${index})" title="Remove file">×</button>
+                `;
+                
+                preview.appendChild(previewItem);
+            });
+
+            // Display validation errors
+            if (validationErrors.length > 0) {
+                errorDiv.innerHTML = validationErrors.join('<br>');
+            }
+
+            // Update upload info and stats
+            const uploadInfo = document.querySelector('.file-upload-info p');
+            uploadInfo.textContent = `📁 ${selectedFiles.length} files selected (${imageCount} images, ${videoCount} videos)`;
+            
+            statsDiv.innerHTML = `
+                📊 <strong>Upload Summary:</strong> ${validFiles}/${selectedFiles.length} valid files | 
+                Total size: ${totalSize.toFixed(2)}MB | 
+                ${imageCount} images, ${videoCount} videos
+            `;
+            statsDiv.style.display = 'block';
+
+            // Enable/disable upload button
+            const uploadBtn = document.getElementById('upload-btn');
+            uploadBtn.disabled = validFiles === 0;
+            if (validFiles === 0) {
+                uploadBtn.textContent = '❌ Cannot Upload - Fix Errors';
+                uploadBtn.style.background = '#dc3545';
+            } else {
+                uploadBtn.textContent = '📤 Upload News Content';
+                uploadBtn.style.background = '';
+            }
+        }
+
+        function validateFile(file, index) {
+            let isValid = true;
+
+            // Check file size (50MB limit)
+            if (file.size > 50 * 1024 * 1024) {
+                validationErrors.push(`❌ File "${file.name}" exceeds 50MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
+                isValid = false;
+            }
+
+            // Check file type
+            const allowedTypes = [
+                'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/bmp', 'image/webp',
+                'video/mp4', 'video/avi', 'video/mov', 'video/webm', 'video/mkv', 'video/x-flv'
+            ];
+            
+            if (!allowedTypes.includes(file.type) && !isValidFileExtension(file.name)) {
+                validationErrors.push(`❌ File "${file.name}" has unsupported format`);
+                isValid = false;
+            }
+
+            return isValid;
+        }
+
+        function isValidFileExtension(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const validExts = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'mp4', 'avi', 'mov', 'webm', 'mkv', 'flv'];
+            return validExts.includes(ext);
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            
+            // Update the file input
+            const fileInput = document.getElementById('media_files');
+            const dataTransfer = new DataTransfer();
+            selectedFiles.forEach(file => dataTransfer.items.add(file));
+            fileInput.files = dataTransfer.files;
+            
+            validateAndDisplayFiles();
+        }
+
+        function getFileType(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'];
+            const videoExts = ['mp4', 'avi', 'mov', 'webm', 'mkv', 'flv'];
+            
+            if (imageExts.includes(ext)) return 'image';
+            if (videoExts.includes(ext)) return 'video';
+            return 'unknown';
+        }
+
+        // News item editing functionality
+        function editNewsItem(index, event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
+            const newsItem = document.getElementById(`news-item-${index}`);
+            newsItem.classList.add('editing');
+            
+            // Focus on the textarea
+            const textarea = document.getElementById(`edit-content-${index}`);
+            textarea.focus();
+            
+            // Auto-resize the textarea
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        }
+
+        function cancelEdit(index, event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
+            const newsItem = document.getElementById(`news-item-${index}`);
+            newsItem.classList.remove('editing');
+            
+            // Reset the textarea content to original
+            const textarea = document.getElementById(`edit-content-${index}`);
+            const originalContent = newsItem.querySelector('.news-content-display').textContent;
+            textarea.value = originalContent;
+        }
+
+        function saveNewsItem(index, event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
+            const textarea = document.getElementById(`edit-content-${index}`);
+            const newContent = textarea.value.trim();
+            
+            if (!newContent) {
+                alert('News content cannot be empty!');
+                return;
+            }
+            
+            // Create form data for the update
+            const formData = new FormData();
+            formData.append('news_content', newContent);
+            
+            // Handle updated links
+            const editLinkInputs = document.querySelectorAll(`#news-item-${index} .edit-link-input`);
+            editLinkInputs.forEach(input => {
+                if (input.value.trim()) {
+                    formData.append('updated_links', input.value.trim());
+                }
+            });
+            
+            // Handle new links
+            const newLinkInputs = document.querySelectorAll(`#new-links-${index} .new-link-input`);
+            newLinkInputs.forEach(input => {
+                if (input.value.trim()) {
+                    formData.append('updated_links', input.value.trim());
+                }
+            });
+            
+            // Handle media file deletions
+            const deletedMediaItems = document.querySelectorAll(`#news-item-${index} .editable-media-item.deleted`);
+            deletedMediaItems.forEach(item => {
+                const mediaId = item.dataset.mediaId;
+                if (mediaId) {
+                    formData.append('deleted_media', mediaId);
+                }
+            });
+            
+            // Handle new file uploads
+            const newMediaFiles = document.getElementById(`new-media-${index}`);
+            if (newMediaFiles && newMediaFiles.files.length > 0) {
+                Array.from(newMediaFiles.files).forEach(file => {
+                    formData.append('new_media_files', file);
+                });
+            }
+            
+            // Send AJAX request to update the news item
+            fetch(`/update-news/${index}`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message and reload page to reflect changes
+                    showFlashMessage('News item updated successfully! Reloading...', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    showFlashMessage(data.error || 'Failed to update news item', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error updating news item:', error);
+                showFlashMessage('Error updating news item', 'error');
+            });
+        }
+
+        function showFlashMessage(message, type) {
+            const flashContainer = document.querySelector('.flash-messages');
+            if (!flashContainer) {
+                const container = document.createElement('div');
+                container.className = 'flash-messages';
+                document.querySelector('.container').insertBefore(container, document.querySelector('.upload-section'));
+            }
+            
+            const flashMessage = document.createElement('div');
+            flashMessage.className = `flash-message flash-${type}`;
+            flashMessage.textContent = message;
+            
+            const flashContainer2 = document.querySelector('.flash-messages');
+            flashContainer2.appendChild(flashMessage);
+            
+            // Remove after 5 seconds
+            setTimeout(() => {
+                flashMessage.remove();
+            }, 5000);
+        }
+
+        // Enhanced drag and drop functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadContainer = document.querySelector('.file-upload-container');
+            const fileInput = document.getElementById('media_files');
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                uploadContainer.addEventListener(eventName, preventDefaults, false);
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                uploadContainer.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                uploadContainer.addEventListener(eventName, unhighlight, false);
+            });
+
+            uploadContainer.addEventListener('drop', handleDrop, false);
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            function highlight(e) {
+                uploadContainer.classList.add('dragover');
+            }
+
+            function unhighlight(e) {
+                uploadContainer.classList.remove('dragover');
+            }
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = Array.from(dt.files);
+                
+                selectedFiles = files;
+                
+                // Update the file input
+                const dataTransfer = new DataTransfer();
+                files.forEach(file => dataTransfer.items.add(file));
+                fileInput.files = dataTransfer.files;
+                
+                validateAndDisplayFiles();
+            }
+
+            // Auto-resize edit textareas
+            document.addEventListener('input', function(e) {
+                if (e.target.classList.contains('edit-textarea')) {
+                    e.target.style.height = 'auto';
+                    e.target.style.height = e.target.scrollHeight + 'px';
+                }
+            });
+
+            // Form submission with progress
+            document.getElementById('upload-form').addEventListener('submit', function(e) {
+                if (selectedFiles.length > 0) {
+                    showUploadProgress();
+                }
+            });
+        });
+
+        function showUploadProgress() {
+            const progressContainer = document.getElementById('upload-progress');
+            const progressBar = document.querySelector('.upload-progress-bar');
+            const uploadBtn = document.getElementById('upload-btn');
+            
+            progressContainer.style.display = 'block';
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '⏳ Uploading...';
+            
+            // Simulate progress (in real implementation, this would be tied to actual upload progress)
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress > 90) progress = 90;
+                progressBar.style.width = progress + '%';
+            }, 200);
+            
+            // Clear interval when form actually submits (this is just for UX)
+                         setTimeout(() => {
+                 clearInterval(interval);
+                 progressBar.style.width = '100%';
+             }, 3000);
+         }
+
+         // Media editing functions
+         function removeMediaItem(newsIndex, mediaId, button, event) {
+             if (event) {
+                 event.preventDefault();
+                 event.stopPropagation();
+             }
+             
+             const mediaItem = button.closest('.editable-media-item');
+             mediaItem.classList.add('deleted');
+             mediaItem.style.opacity = '0.5';
+             mediaItem.style.textDecoration = 'line-through';
+             button.textContent = '↶ Undo';
+             button.onclick = (e) => undoRemoveMediaItem(mediaItem, button, mediaId, e);
+         }
+
+         function undoRemoveMediaItem(mediaItem, button, mediaId, event) {
+             if (event) {
+                 event.preventDefault();
+                 event.stopPropagation();
+             }
+             
+             mediaItem.classList.remove('deleted');
+             mediaItem.style.opacity = '1';
+             mediaItem.style.textDecoration = 'none';
+             button.textContent = '🗑️ Remove';
+             button.onclick = (e) => removeMediaItem(null, mediaId, button, e);
+         }
+
+         function removeLinkItem(button, event) {
+             if (event) {
+                 event.preventDefault();
+                 event.stopPropagation();
+             }
+             button.closest('.editable-media-item').remove();
+         }
+
+         function addNewLinkToEdit(newsIndex, event) {
+             if (event) {
+                 event.preventDefault();
+                 event.stopPropagation();
+             }
+             
+             const container = document.getElementById(`new-links-${newsIndex}`);
+             const newLinkDiv = document.createElement('div');
+             newLinkDiv.className = 'link-input';
+             newLinkDiv.innerHTML = `
+                 <input type="url" class="new-link-input" placeholder="https://example.com/image.jpg">
+                 <button type="button" class="btn btn-danger btn-small" onclick="removeLinkFromEdit(this, event)">Remove</button>
+             `;
+             container.appendChild(newLinkDiv);
+         }
+
+         function removeLinkFromEdit(button, event) {
+             if (event) {
+                 event.preventDefault();
+                 event.stopPropagation();
+             }
+             button.parentElement.remove();
+         }
+
+         // Initialize media editing features
+         document.addEventListener('DOMContentLoaded', function() {
+             // Prevent file dialog from opening on button clicks
+             document.addEventListener('click', function(e) {
+                 // If it's a button inside a file upload container, prevent event propagation
+                 if (e.target.tagName === 'BUTTON' && e.target.closest('.file-upload-container')) {
+                     e.stopPropagation();
+                     e.preventDefault();
+                 }
+                 
+                 // If it's any button with onclick handlers, ensure proper event handling
+                 if (e.target.tagName === 'BUTTON' && e.target.onclick) {
+                     e.stopPropagation();
+                 }
+             });
+             
+             // Handle new file selection in edit mode
+             document.addEventListener('change', function(e) {
+                 if (e.target.classList.contains('new-media-files')) {
+                     const newsIndex = e.target.id.split('-')[2];
+                     const previewContainer = document.getElementById(`new-preview-${newsIndex}`);
+                     previewContainer.innerHTML = '';
+                     
+                     if (e.target.files.length > 0) {
+                         Array.from(e.target.files).forEach(file => {
+                             const fileType = getFileType(file.name);
+                             const icon = fileType === 'image' ? '🖼️' : '🎥';
+                             const size = (file.size / (1024 * 1024)).toFixed(2);
+                             
+                             const previewItem = document.createElement('div');
+                             previewItem.className = 'new-file-preview-item';
+                             previewItem.innerHTML = `
+                                 <span>${icon}</span>
+                                 <span>${file.name}</span>
+                                 <small>(${size}MB)</small>
+                             `;
+                             previewContainer.appendChild(previewItem);
+                         });
+                     }
+                 }
+             });
+         });
+     </script>
+ </body>
+ </html> 
