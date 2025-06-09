@@ -84,17 +84,35 @@ TTS_CONFIG_OPENAI = {
     "model": "tts-1-hd"  # Higher quality model
 }
 TTS_CONFIG_GOOGLE = {
-    "voice": "alloy",  # OpenAI TTS voice (works well with Filipino)
-    "speed": 0.9,      # Slightly slower for Filipino pronunciation clarity
+    "language_code": "en-US",  # Filipino (Philippines)
+    "voice_name": "en-US-Chirp3-HD-Achernar",  # Filipino female voice
+    "voice_gender": "FEMALE",
+    "speaking_rate": 0.9,  # Slightly slower for clarity
+    "pitch": 0.0,  # Normal pitch
     "output_format": "mp3",
-    "model": "tts-1-hd"  # Higher quality model
+    "audio_encoding": "MP3"
 }
+# TTS_CONFIG_GOOGLE = {
+#     "language_code": "fil-PH",  # Filipino (Philippines)
+#     "voice_name": "fil-PH-Standard-A",  # Filipino female voice
+#     "voice_gender": "FEMALE",
+#     "speaking_rate": 0.9,  # Slightly slower for clarity
+#     "pitch": 0.0,  # Normal pitch
+#     "output_format": "mp3",
+#     "audio_encoding": "MP3"
+# }
 
 # Subtitle/Timing Configuration
 SUBTITLE_CONFIG = {
     "words_per_minute": 150,  # Average speaking rate
     "pause_duration": 0.5,    # Pause between sentences
-    "segment_gap": 1.0        # Gap between segments
+    "segment_gap": 1.0,       # Gap between segments
+    "max_subtitle_duration": 3.0,    # Maximum duration for a single subtitle
+    "min_subtitle_duration": 1.0,    # Minimum duration for a single subtitle
+    "max_words_per_subtitle": 8,     # Maximum words per subtitle
+    "min_words_per_subtitle": 3,     # Minimum words per subtitle
+    "phrase_break_threshold": 0.5,   # Pause threshold to break phrases (seconds)
+    "grouping_mode": "smart"          # "word", "phrase", "sentence", or "smart"
 }
 
 print("Configuration loaded successfully")
