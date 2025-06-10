@@ -326,6 +326,103 @@
             margin-top: 20px;
         }
 
+        .sync-controls {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .sync-controls h4 {
+            color: #3498db;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+
+        .sync-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-size: 0.8em;
+        }
+
+        .sync-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4CAF50;
+        }
+
+        .sync-indicator.warning {
+            background: #ff9800;
+        }
+
+        .sync-indicator.error {
+            background: #f44336;
+        }
+
+        .sync-controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .sync-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8em;
+        }
+
+        .sync-control label {
+            min-width: 80px;
+            color: #ccc;
+        }
+
+        .sync-control input[type="range"] {
+            flex: 1;
+            height: 3px;
+        }
+
+        .sync-control .value {
+            min-width: 50px;
+            text-align: right;
+            font-family: monospace;
+        }
+
+        .sync-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .sync-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.8em;
+            transition: background 0.3s ease;
+        }
+
+        .sync-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .sync-btn.active {
+            background: #3498db;
+        }
+
+        .keyboard-shortcuts {
+            font-size: 0.75em;
+            color: #888;
+            margin-top: 8px;
+            line-height: 1.3;
+        }
+
         .volume-group {
             display: flex;
             align-items: center;
@@ -541,6 +638,11 @@
                     <span id="newsAudioVolumeValue" class="volume-value">90%</span>
                 </div>
                 <div class="volume-group">
+                    <label>🎵 Background:</label>
+                    <input type="range" id="backgroundVolume" class="volume-slider" min="0" max="100" value="100" title="Background Music Volume">
+                    <span id="backgroundVolumeValue" class="volume-value">100%</span>
+                </div>
+                <div class="volume-group">
                     <label>🎬 Video Audio:</label>
                     <input type="range" id="videoVolume" class="volume-slider" min="0" max="100" value="100" title="Video Audio Volume">
                     <span id="videoVolumeValue" class="volume-value">100%</span>
@@ -549,6 +651,50 @@
                     <label>🔊 Master:</label>
                     <input type="range" id="masterVolume" class="volume-slider" min="0" max="100" value="85" title="Master Volume">
                     <span id="masterVolumeValue" class="volume-value">85%</span>
+                </div>
+            </div>
+
+            <div class="sync-controls">
+                <h4>🎯 Audio-Visual Sync Controls</h4>
+                <div class="sync-status">
+                    <div id="syncStatusIndicator" class="sync-indicator"></div>
+                    <span>Sync Status: <span id="syncStatusText">Initializing...</span></span>
+                    <span>|</span>
+                    <span>Drift: <span id="syncDriftText">0ms</span></span>
+                </div>
+                
+                <div class="sync-controls-grid">
+                    <div class="sync-control">
+                        <label>Sync Offset:</label>
+                        <input type="range" id="syncOffset" min="-1000" max="1000" value="300" step="50" title="Delay visuals relative to audio">
+                        <span id="syncOffsetValue" class="value">300ms</span>
+                    </div>
+                    <div class="sync-control">
+                        <label>Tolerance:</label>
+                        <input type="range" id="syncTolerance" min="50" max="500" value="100" step="25" title="Acceptable sync drift before correction">
+                        <span id="syncToleranceValue" class="value">100ms</span>
+                    </div>
+                    <div class="sync-control">
+                        <label>Preload:</label>
+                        <input type="range" id="preloadTime" min="0" max="2000" value="500" step="100" title="How early to prepare media">
+                        <span id="preloadTimeValue" class="value">500ms</span>
+                    </div>
+                    <div class="sync-control">
+                        <label>Transition:</label>
+                        <input type="range" id="transitionDelay" min="0" max="1000" value="200" step="50" title="Delay between media switches">
+                        <span id="transitionDelayValue" class="value">200ms</span>
+                    </div>
+                </div>
+                
+                <div class="sync-buttons">
+                    <button id="syncCalibrate" class="sync-btn">🎯 Auto Calibrate</button>
+                    <button id="syncReset" class="sync-btn">🔄 Reset</button>
+                    <button id="audioFirstMode" class="sync-btn active">🎵 Audio First</button>
+                    <button id="manualSyncMode" class="sync-btn active">⚙️ Manual</button>
+                </div>
+                
+                <div class="keyboard-shortcuts">
+                    <strong>Keyboard:</strong> [ ] = Sync offset ±50ms | ; ' = Fine tune ±10ms | P = Audio-first toggle
                 </div>
             </div>
         </div>
@@ -563,6 +709,7 @@
 
     <!-- Hidden audio elements for news playback -->
     <audio id="newsAudio" preload="metadata"></audio>
+    <audio id="backgroundAudio" preload="metadata" loop></audio>
     <audio id="segmentAudio" preload="metadata"></audio>
 
     <script>
@@ -578,16 +725,34 @@
                 this.activeSegment = null;
                 this.debugMode = false;
                 this.isLoading = false;
-                this.syncTolerance = 0.1;
+                
+                // Enhanced sync properties
+                this.syncOffset = 300; // ms - delay visuals relative to audio
+                this.syncTolerance = 100; // ms - acceptable drift before correction
+                this.preloadTime = 500; // ms - how early to prepare media
+                this.transitionDelay = 200; // ms - delay between media switches
+                this.audioFirstMode = false; // prioritize audio timing
+                this.lastSyncCheck = 0;
+                this.syncDrift = 0;
+                this.pendingSegmentChanges = new Map();
+                this.preloadedMedia = new Map();
+                
+                // Timing tracking
                 this.playbackStartTime = null;
                 this.pausedDuration = 0;
                 this.pausedTime = 0;
                 this.pauseStartTime = null;
+                this.preciseCurrentTime = 0;
+                this.lastAudioTime = 0;
+                this.audioTimeUpdateCount = 0;
+                
+                // Media rotation
                 this.imageRotationInterval = null;
                 this.currentImageIndex = 0;
                 
                 // Audio/Video elements
                 this.newsAudio = document.getElementById('newsAudio');
+                this.backgroundAudio = document.getElementById('backgroundAudio');
                 this.segmentAudio = document.getElementById('segmentAudio');
                 this.mainVideo = document.getElementById('mainVideo');
                 this.mainImage = document.getElementById('mainImage');
@@ -608,6 +773,7 @@
                 
                 // Volume controls
                 this.newsAudioVolume = document.getElementById('newsAudioVolume');
+                this.backgroundVolume = document.getElementById('backgroundVolume');
                 this.videoVolume = document.getElementById('videoVolume');
                 this.masterVolume = document.getElementById('masterVolume');
                 
@@ -621,6 +787,10 @@
                 this.debugLog = document.getElementById('debugLog');
                 this.loadingOverlay = document.getElementById('loadingOverlay');
                 
+                // Background music fade control
+                this.backgroundFadeStarted = false;
+                this.backgroundFadeStartTime = null;
+                
                 this.init();
             }
             
@@ -632,6 +802,7 @@
                     await this.loadManifest();
                     this.setupAudioElements();
                     this.populatePlaylist();
+                    this.initializeSyncControls();
                     this.updateStatus('ready');
                     this.log('info', 'Player initialized successfully!');
                 } catch (error) {
@@ -655,12 +826,29 @@
                 
                 // Volume controls
                 this.newsAudioVolume.addEventListener('input', (e) => this.updateVolume('news', e.target.value));
+                this.backgroundVolume.addEventListener('input', (e) => this.updateVolume('background', e.target.value));
                 this.videoVolume.addEventListener('input', (e) => this.updateVolume('video', e.target.value));
                 this.masterVolume.addEventListener('input', (e) => this.updateVolume('master', e.target.value));
                 
-                // Audio event listeners
+                // Sync controls
+                document.getElementById('syncOffset').addEventListener('input', (e) => this.updateSyncSetting('offset', e.target.value));
+                document.getElementById('syncTolerance').addEventListener('input', (e) => this.updateSyncSetting('tolerance', e.target.value));
+                document.getElementById('preloadTime').addEventListener('input', (e) => this.updateSyncSetting('preload', e.target.value));
+                document.getElementById('transitionDelay').addEventListener('input', (e) => this.updateSyncSetting('transition', e.target.value));
+                
+                document.getElementById('syncCalibrate').addEventListener('click', () => this.calibrateSync());
+                document.getElementById('syncReset').addEventListener('click', () => this.resetSync());
+                document.getElementById('audioFirstMode').addEventListener('click', () => this.toggleAudioFirst());
+                document.getElementById('manualSyncMode').addEventListener('click', () => this.setManualMode());
+                
+                // Keyboard shortcuts for sync
+                document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
+                
+                // Audio event listeners with enhanced tracking
                 this.newsAudio.addEventListener('timeupdate', () => this.updateTimeline());
                 this.newsAudio.addEventListener('ended', () => this.handlePlaybackEnd());
+                this.newsAudio.addEventListener('loadstart', () => this.log('info', 'Audio loading started'));
+                this.newsAudio.addEventListener('canplaythrough', () => this.log('info', 'Audio ready for playback'));
                 
                 this.log('info', 'Event listeners setup complete');
             }
@@ -702,8 +890,12 @@
                         cumulativeTime = endTime;
                     }
                     
+                    // Check for outro audio and add it as last segment if it exists
+                    const outroDuration = await this.checkAndAddOutroSegment(cumulativeTime);
+                    cumulativeTime += outroDuration;
+                    
                     // Calculate total duration
-                    this.totalDuration = this.manifest.combined_audio.total_duration;
+                    this.totalDuration = cumulativeTime || this.manifest.combined_audio.total_duration;
                     
                     this.log('info', `Manifest loaded: ${this.segments.length} news segments, ${this.formatTime(this.totalDuration)} total duration`);
                     
@@ -721,6 +913,65 @@
                 }
             }
             
+            async setupBackgroundMusic() {
+                try {
+                    // Try to find background music file in generated/audio directory
+                    const response = await fetch('/generated/audio/background_music.mp3', { method: 'HEAD' });
+                    if (response.ok) {
+                        this.backgroundAudio.src = '/generated/audio/background_music.mp3';
+                        this.backgroundAudio.volume = 0.15; // Lower background volume (15%)
+                        this.log('info', 'Background music set: /generated/audio/background_music.mp3');
+                    } else {
+                        throw new Error('Background music not found');
+                    }
+                } catch (error) {
+                    this.log('info', 'Background music not available - continuing without background audio');
+                    // Disable background music controls if no background music
+                    const bgVolumeGroup = document.querySelector('.volume-group:nth-child(2)');
+                    if (bgVolumeGroup) {
+                        bgVolumeGroup.style.opacity = '0.5';
+                        bgVolumeGroup.title = 'Background music not available';
+                    }
+                }
+            }
+            
+            async checkAndAddOutroSegment(startTime) {
+                try {
+                    const response = await fetch('/generated/audio/outro.mp3', { method: 'HEAD' });
+                    if (response.ok) {
+                        // Create a fake audio element to get duration
+                        const audio = new Audio('/generated/audio/outro.mp3');
+                        await new Promise((resolve) => {
+                            audio.addEventListener('loadedmetadata', resolve);
+                        });
+                        
+                        const outroDuration = audio.duration;
+                        this.log('info', `Found outro audio: ${this.formatTime(outroDuration)} duration`);
+                        
+                        // Add outro as last segment
+                        this.segments.push({
+                            name: 'outro',
+                            display_name: 'News Outro',
+                            script: 'Thank you for watching Nexcaster News. Stay informed, stay connected.',
+                            start_time: startTime,
+                            end_time: startTime + outroDuration,
+                            duration: outroDuration,
+                            audio_file: 'outro.mp3',
+                            audio_path: '/generated/audio/outro.mp3',
+                            media: [],
+                            voice_used: 'outro',
+                            language: 'en',
+                            _isOutro: true
+                        });
+                        
+                        return outroDuration;
+                    }
+                } catch (error) {
+                    this.log('info', 'Outro audio not found - continuing without outro');
+                }
+                return 0;
+            }
+            
             setupAudioElements() {
                 this.log('info', 'Setting up audio elements...');
                 
@@ -734,14 +985,39 @@
                     this.log('info', `Main news audio set: ${audioPath}`);
                 }
                 
+                // Set up background music if available (graceful fallback)
+                this.setupBackgroundMusic();
+                
                 // Apply initial volume settings
                 this.updateVolume('news', this.newsAudioVolume.value);
+                this.updateVolume('background', this.backgroundVolume.value);
                 this.updateVolume('video', this.videoVolume.value);
                 this.updateVolume('master', this.masterVolume.value);
                 
                 this.updateStatus('audio', 'ready');
                 this.updateStatus('media', 'ready');
                 this.log('info', 'Audio elements setup complete');
+            }
+            
+            initializeSyncControls() {
+                this.log('info', 'Initializing sync controls...');
+                
+                // Set initial values in UI
+                document.getElementById('syncOffset').value = this.syncOffset;
+                document.getElementById('syncTolerance').value = this.syncTolerance;
+                document.getElementById('preloadTime').value = this.preloadTime;
+                document.getElementById('transitionDelay').value = this.transitionDelay;
+                
+                document.getElementById('syncOffsetValue').textContent = `${this.syncOffset}ms`;
+                document.getElementById('syncToleranceValue').textContent = `${this.syncTolerance}ms`;
+                document.getElementById('preloadTimeValue').textContent = `${this.preloadTime}ms`;
+                document.getElementById('transitionDelayValue').textContent = `${this.transitionDelay}ms`;
+                
+                // Set initial sync status
+                document.getElementById('syncStatusText').textContent = 'Ready';
+                document.getElementById('syncDriftText').textContent = '0ms';
+                
+                this.log('info', 'Sync controls initialized with defaults');
             }
             
             populatePlaylist() {
@@ -784,6 +1060,7 @@
             
             getSegmentDisplayName(segment) {
                 const icons = {
+                    'outro': '🎬',
                     'opening_greeting': '👋',
                     'summary_opening': '📰',
                     'summary1': '🔥',
@@ -846,18 +1123,39 @@
                     if (this.pauseStartTime && this.pausedTime !== undefined) {
                         this.pausedDuration += (performance.now() - this.pauseStartTime);
                         this.currentTime = this.pausedTime;
+                        this.preciseCurrentTime = this.pausedTime;
                         this.newsAudio.currentTime = this.currentTime;
                         this.pauseStartTime = null;
                         this.log('info', `Resuming playback from ${this.formatTime(this.currentTime)}`);
                     } else {
                         this.currentTime = 0;
+                        this.preciseCurrentTime = 0;
                         this.playbackStartTime = performance.now();
                         this.pausedDuration = 0;
                         this.newsAudio.currentTime = 0;
-                        this.log('info', 'Starting fresh playback');
+                        
+                        // Reset sync tracking
+                        this.syncDrift = 0;
+                        this.audioTimeUpdateCount = 0;
+                        this.lastAudioTime = 0;
+                        this.pendingSegmentChanges.clear();
+                        this.preloadedMedia.clear();
+                        
+                        this.log('info', 'Starting fresh playback with enhanced sync');
                     }
                     
                     await this.newsAudio.play();
+                    
+                    // Handle background music based on current time
+                    if (this.backgroundAudio.src) {
+                        this.backgroundAudio.currentTime = this.currentTime;
+                        await this.backgroundAudio.play();
+                        this.log('info', `Background music started at ${this.formatTime(this.currentTime)}`);
+                        
+                        // Duck background music when news audio starts
+                        this.duckBackgroundMusic();
+                    }
+                    
                     this.startMediaSync();
                     
                     this.log('info', 'Playback started successfully');
@@ -886,6 +1184,7 @@
                 }
                 
                 this.newsAudio.pause();
+                this.backgroundAudio.pause();
                 this.segmentAudio.pause();
                 this.mainVideo.pause();
                 
@@ -907,10 +1206,31 @@
                 this.pausedDuration = 0;
                 this.pausedTime = 0;
                 this.pauseStartTime = null;
+                this.preciseCurrentTime = 0;
+                
+                // Reset background fade state
+                this.backgroundFadeStarted = false;
+                this.backgroundFadeStartTime = null;
+                
+                // Restore background music to 100% when stopping
+                if (this.backgroundAudio.src) {
+                    this.backgroundVolume.value = 100;
+                    this.updateVolume('background', 100);
+                    document.getElementById('backgroundVolumeValue').textContent = '100%';
+                }
+                
+                // Clear sync state
+                this.syncDrift = 0;
+                this.audioTimeUpdateCount = 0;
+                this.lastAudioTime = 0;
+                this.pendingSegmentChanges.clear();
+                this.preloadedMedia.clear();
                 
                 // Stop and reset all audio/video
                 this.newsAudio.pause();
                 this.newsAudio.currentTime = 0;
+                this.backgroundAudio.pause();
+                this.backgroundAudio.currentTime = 0;
                 this.segmentAudio.pause();
                 this.segmentAudio.currentTime = 0;
                 this.mainVideo.pause();
@@ -953,37 +1273,165 @@
             startMediaSync() {
                 if (!this.isPlaying) return;
                 
-                // Use audio currentTime as the primary timeline
-                this.currentTime = this.newsAudio.currentTime;
+                const now = performance.now();
                 
-                // Find current segment
-                const currentSegment = this.segments.find(segment => 
-                    this.currentTime >= segment.start_time && 
-                    this.currentTime <= segment.end_time
+                // Enhanced timing calculation
+                this.updatePreciseTiming();
+                
+                // Apply sync offset for visual timing
+                const visualTime = this.preciseCurrentTime - (this.syncOffset / 1000);
+                
+                // Find current segment for visuals (with offset)
+                const visualSegment = this.segments.find(segment => 
+                    visualTime >= segment.start_time && 
+                    visualTime <= segment.end_time
                 );
                 
-                // Update active segment if changed
-                if (currentSegment !== this.activeSegment) {
-                    if (this.activeSegment) {
-                        this.deactivateSegment(this.activeSegment);
-                    }
-                    if (currentSegment) {
-                        this.activateSegment(currentSegment);
-                    }
-                    this.activeSegment = currentSegment;
+                // Find upcoming segment for preloading
+                const upcomingSegment = this.segments.find(segment => 
+                    segment.start_time > visualTime && 
+                    segment.start_time <= visualTime + (this.preloadTime / 1000)
+                );
+                
+                // Preload upcoming media
+                if (upcomingSegment && !this.preloadedMedia.has(upcomingSegment.name)) {
+                    this.preloadSegmentMedia(upcomingSegment);
                 }
                 
+                // Check for sync drift and handle segment changes
+                this.checkSyncDrift();
+                this.handleSegmentTransition(visualSegment, now);
+                
+                // Update UI
                 this.updateActivePlaylistItems();
-                this.updateMediaInfo(currentSegment);
+                this.updateMediaInfo(visualSegment);
+                this.updateSyncStatus();
                 
                 // Schedule next sync frame
                 requestAnimationFrame(() => this.startMediaSync());
+            }
+            
+            updatePreciseTiming() {
+                const audioTime = this.newsAudio.currentTime;
+                const now = performance.now();
+                
+                // Track audio time changes for drift detection
+                if (audioTime !== this.lastAudioTime) {
+                    this.lastAudioTime = audioTime;
+                    this.audioTimeUpdateCount++;
+                }
+                
+                // Use audio time as primary, but validate with performance timing
+                if (this.audioFirstMode) {
+                    this.preciseCurrentTime = audioTime;
+                } else {
+                    // Combine audio timing with performance timing for better accuracy
+                    const performanceTime = this.playbackStartTime ? 
+                        (now - this.playbackStartTime - this.pausedDuration) / 1000 : audioTime;
+                    
+                    // Use audio time but smooth with performance timing
+                    const timeDiff = Math.abs(audioTime - performanceTime);
+                    if (timeDiff < 0.1) {
+                        this.preciseCurrentTime = audioTime;
+                    } else {
+                        this.preciseCurrentTime = performanceTime;
+                        this.log('warning', `Time sync drift detected: ${timeDiff.toFixed(3)}s`);
+                    }
+                }
+                
+                this.currentTime = this.preciseCurrentTime;
+            }
+            
+            handleSegmentTransition(targetSegment, now) {
+                // Check if we need to change segments
+                if (targetSegment !== this.activeSegment) {
+                    const segmentKey = targetSegment ? targetSegment.name : 'none';
+                    
+                    // Check if we already have a pending change for this segment
+                    if (this.pendingSegmentChanges.has(segmentKey)) {
+                        const pendingChange = this.pendingSegmentChanges.get(segmentKey);
+                        
+                        // Execute the change if enough time has passed
+                        if (now >= pendingChange.executeAt) {
+                            this.executeSegmentChange(targetSegment);
+                            this.pendingSegmentChanges.delete(segmentKey);
+                        }
+                    } else {
+                        // Schedule a new segment change
+                        const executeAt = now + this.transitionDelay;
+                        this.pendingSegmentChanges.set(segmentKey, {
+                            segment: targetSegment,
+                            executeAt: executeAt
+                        });
+                        
+                        this.log('info', `Scheduled segment change to: ${targetSegment ? targetSegment.display_name : 'none'} in ${this.transitionDelay}ms`);
+                    }
+                } else {
+                    // Clear any pending changes if we're staying in the same segment
+                    const currentKey = this.activeSegment ? this.activeSegment.name : 'none';
+                    if (this.pendingSegmentChanges.has(currentKey)) {
+                        this.pendingSegmentChanges.delete(currentKey);
+                    }
+                }
+            }
+            
+            executeSegmentChange(targetSegment) {
+                if (this.activeSegment) {
+                    this.deactivateSegment(this.activeSegment);
+                }
+                if (targetSegment) {
+                    this.activateSegment(targetSegment);
+                }
+                this.activeSegment = targetSegment;
+                
+                this.log('info', `Segment changed to: ${targetSegment ? targetSegment.display_name : 'none'}`);
+            }
+            
+            checkSyncDrift() {
+                const audioTime = this.newsAudio.currentTime;
+                const expectedTime = this.preciseCurrentTime;
+                this.syncDrift = (audioTime - expectedTime) * 1000; // Convert to ms
+                
+                // Auto-correct if drift exceeds tolerance
+                if (Math.abs(this.syncDrift) > this.syncTolerance && !this.audioFirstMode) {
+                    this.log('warning', `Auto-correcting sync drift: ${this.syncDrift.toFixed(1)}ms`);
+                    this.newsAudio.currentTime = expectedTime;
+                    this.syncDrift = 0;
+                }
+            }
+            
+            preloadSegmentMedia(segment) {
+                if (!segment.media || segment.media.length === 0) return;
+                
+                this.log('info', `Preloading media for: ${segment.display_name}`);
+                
+                // Preload images
+                const images = segment.media.filter(m => m.image);
+                images.forEach(media => {
+                    const img = new Image();
+                    img.src = media.path.startsWith('/') ? media.path : '/' + media.path;
+                    img.onload = () => this.log('info', `Preloaded image: ${media.image}`);
+                });
+                
+                // Mark as preloaded
+                this.preloadedMedia.set(segment.name, true);
             }
             
             async activateSegment(segment) {
                 this.log('info', `Activating segment: ${segment.display_name}`);
                 
                 try {
+                    // Handle outro segments with individual audio playback
+                    if (segment._isOutro) {
+                        this.log('info', `Playing outro audio: ${segment.audio_path}`);
+                        this.segmentAudio.src = segment.audio_path;
+                        this.segmentAudio.currentTime = 0;
+                        await this.segmentAudio.play();
+                        
+                        // Duck background music for outro
+                        this.duckBackgroundMusic();
+                    }
+                    
                     // Clear any existing image rotation
                     this.clearImageRotation();
                     
@@ -1015,6 +1463,15 @@
             
             deactivateSegment(segment) {
                 this.log('info', `Deactivating segment: ${segment.display_name}`);
+                
+                // Handle outro segments
+                if (segment._isOutro) {
+                    this.segmentAudio.pause();
+                    
+                    // Restore background music when outro ends
+                    this.restoreBackgroundMusic();
+                }
+                
                 // Clear image rotation when segment ends
                 this.clearImageRotation();
             }
@@ -1174,12 +1631,17 @@
                         this.segmentAudio.volume = finalVolume;
                         document.getElementById('newsAudioVolumeValue').textContent = `${value}%`;
                         break;
+                    case 'background':
+                        this.backgroundAudio.volume = finalVolume;
+                        document.getElementById('backgroundVolumeValue').textContent = `${value}%`;
+                        break;
                     case 'video':
                         this.mainVideo.volume = finalVolume;
                         document.getElementById('videoVolumeValue').textContent = `${value}%`;
                         break;
                     case 'master':
                         this.updateVolume('news', this.newsAudioVolume.value);
+                        this.updateVolume('background', this.backgroundVolume.value);
                         this.updateVolume('video', this.videoVolume.value);
                         document.getElementById('masterVolumeValue').textContent = `${value}%`;
                         break;
@@ -1188,6 +1650,10 @@
             
             handlePlaybackEnd() {
                 this.log('info', 'News playback ended');
+                
+                // Restore background music when news audio ends
+                this.restoreBackgroundMusic();
+                
                 this.stop();
             }
             
@@ -1248,6 +1714,189 @@
                 const entries = this.debugLog.children;
                 if (entries.length > 100) {
                     entries[0].remove();
+                }
+            }
+            
+            // Sync control methods
+            updateSyncSetting(setting, value) {
+                const numValue = parseInt(value);
+                
+                switch (setting) {
+                    case 'offset':
+                        this.syncOffset = numValue;
+                        document.getElementById('syncOffsetValue').textContent = `${numValue}ms`;
+                        this.log('info', `Sync offset set to: ${numValue}ms`);
+                        break;
+                    case 'tolerance':
+                        this.syncTolerance = numValue;
+                        document.getElementById('syncToleranceValue').textContent = `${numValue}ms`;
+                        this.log('info', `Sync tolerance set to: ${numValue}ms`);
+                        break;
+                    case 'preload':
+                        this.preloadTime = numValue;
+                        document.getElementById('preloadTimeValue').textContent = `${numValue}ms`;
+                        this.log('info', `Preload time set to: ${numValue}ms`);
+                        break;
+                    case 'transition':
+                        this.transitionDelay = numValue;
+                        document.getElementById('transitionDelayValue').textContent = `${numValue}ms`;
+                        this.log('info', `Transition delay set to: ${numValue}ms`);
+                        break;
+                }
+            }
+            
+            calibrateSync() {
+                this.log('info', 'Starting automatic sync calibration...');
+                
+                // Simple calibration: analyze recent sync drift patterns
+                if (this.audioTimeUpdateCount > 10) {
+                    const avgDrift = this.syncDrift;
+                    const calibrationOffset = this.syncOffset - Math.round(avgDrift);
+                    
+                    // Apply calibration with bounds checking
+                    this.syncOffset = Math.max(-1000, Math.min(1000, calibrationOffset));
+                    document.getElementById('syncOffset').value = this.syncOffset;
+                    document.getElementById('syncOffsetValue').textContent = `${this.syncOffset}ms`;
+                    
+                    this.log('info', `Auto-calibrated sync offset to: ${this.syncOffset}ms (was drift: ${avgDrift.toFixed(1)}ms)`);
+                } else {
+                    this.log('warning', 'Not enough playback data for calibration. Play for a few seconds first.');
+                }
+            }
+            
+            resetSync() {
+                this.log('info', 'Resetting sync settings to defaults');
+                
+                // Reset to defaults
+                this.syncOffset = 300;
+                this.syncTolerance = 100;
+                this.preloadTime = 500;
+                this.transitionDelay = 200;
+                this.audioFirstMode = false;
+                
+                // Update UI
+                document.getElementById('syncOffset').value = this.syncOffset;
+                document.getElementById('syncTolerance').value = this.syncTolerance;
+                document.getElementById('preloadTime').value = this.preloadTime;
+                document.getElementById('transitionDelay').value = this.transitionDelay;
+                
+                document.getElementById('syncOffsetValue').textContent = `${this.syncOffset}ms`;
+                document.getElementById('syncToleranceValue').textContent = `${this.syncTolerance}ms`;
+                document.getElementById('preloadTimeValue').textContent = `${this.preloadTime}ms`;
+                document.getElementById('transitionDelayValue').textContent = `${this.transitionDelay}ms`;
+                
+                this.setManualMode();
+            }
+            
+            toggleAudioFirst() {
+                this.audioFirstMode = !this.audioFirstMode;
+                
+                const audioFirstBtn = document.getElementById('audioFirstMode');
+                const manualBtn = document.getElementById('manualSyncMode');
+                
+                if (this.audioFirstMode) {
+                    audioFirstBtn.classList.add('active');
+                    manualBtn.classList.remove('active');
+                    this.log('info', 'Audio-first mode enabled');
+                } else {
+                    audioFirstBtn.classList.remove('active');
+                    manualBtn.classList.add('active');
+                    this.log('info', 'Audio-first mode disabled');
+                }
+            }
+            
+            setManualMode() {
+                this.audioFirstMode = false;
+                document.getElementById('audioFirstMode').classList.remove('active');
+                document.getElementById('manualSyncMode').classList.add('active');
+                this.log('info', 'Manual sync mode enabled');
+            }
+            
+            handleKeyboardShortcuts(event) {
+                // Only handle shortcuts when not typing in inputs
+                if (event.target.tagName === 'INPUT') return;
+                
+                switch (event.key) {
+                    case '[':
+                        event.preventDefault();
+                        this.adjustSyncOffset(-50);
+                        break;
+                    case ']':
+                        event.preventDefault();
+                        this.adjustSyncOffset(50);
+                        break;
+                    case ';':
+                        event.preventDefault();
+                        this.adjustSyncOffset(-10);
+                        break;
+                    case "'":
+                        event.preventDefault();
+                        this.adjustSyncOffset(10);
+                        break;
+                    case 'p':
+                    case 'P':
+                        event.preventDefault();
+                        this.toggleAudioFirst();
+                        break;
+                }
+            }
+            
+            adjustSyncOffset(delta) {
+                this.syncOffset = Math.max(-1000, Math.min(1000, this.syncOffset + delta));
+                document.getElementById('syncOffset').value = this.syncOffset;
+                document.getElementById('syncOffsetValue').textContent = `${this.syncOffset}ms`;
+                this.log('info', `Sync offset adjusted to: ${this.syncOffset}ms`);
+            }
+            
+            updateSyncStatus() {
+                const indicator = document.getElementById('syncStatusIndicator');
+                const statusText = document.getElementById('syncStatusText');
+                const driftText = document.getElementById('syncDriftText');
+                
+                // Update drift display
+                driftText.textContent = `${this.syncDrift.toFixed(1)}ms`;
+                
+                // Update status based on drift and mode
+                const absDrift = Math.abs(this.syncDrift);
+                
+                if (this.audioFirstMode) {
+                    indicator.className = 'sync-indicator';
+                    statusText.textContent = 'Audio Priority';
+                } else if (absDrift <= this.syncTolerance / 2) {
+                    indicator.className = 'sync-indicator';
+                    statusText.textContent = 'In Sync';
+                } else if (absDrift <= this.syncTolerance) {
+                    indicator.className = 'sync-indicator warning';
+                    statusText.textContent = 'Minor Drift';
+                } else {
+                    indicator.className = 'sync-indicator error';
+                    statusText.textContent = 'Sync Issue';
+                }
+            }
+            
+            duckBackgroundMusic() {
+                // Smoothly reduce background music to 20% when main news audio plays
+                if (this.backgroundAudio.src) {
+                    this.log('info', 'Ducking background music to 20%');
+                    this.backgroundVolume.value = 20;
+                    this.updateVolume('background', 20);
+                    document.getElementById('backgroundVolumeValue').textContent = '20%';
+                    this.backgroundFadeStarted = true;
+                } else {
+                    this.log('info', 'No background music to duck');
+                }
+            }
+            
+            restoreBackgroundMusic() {
+                // Restore background music to 100% when main news audio ends
+                if (this.backgroundAudio.src) {
+                    this.log('info', 'Restoring background music to 100%');
+                    this.backgroundVolume.value = 100;
+                    this.updateVolume('background', 100);
+                    document.getElementById('backgroundVolumeValue').textContent = '100%';
+                    this.backgroundFadeStarted = false;
+                } else {
+                    this.log('info', 'No background music to restore');
                 }
             }
             
