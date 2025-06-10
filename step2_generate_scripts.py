@@ -9,7 +9,156 @@ import json
 import openai
 from datetime import datetime
 import pytz
-from config import SEGMENT_TYPES, DEFAULT_SEGMENT_ORDER, STATION_INFO, LLM_CONFIG, LANGUAGE
+import re
+from config import SEGMENT_TYPES, DEFAULT_SEGMENT_ORDER, STATION_INFO, LLM_CONFIG, LANGUAGE, FILIPINO_TEXT_PROCESSING, USE_REPLACEMENTS
+
+def clean_special_characters(text):
+    """Replace special characters with standard equivalents"""
+    for char, replacement in FILIPINO_TEXT_PROCESSING["special_chars"].items():
+        text = text.replace(char, replacement)
+    return text
+
+def apply_filipino_replacements(text):
+    """Apply Filipino pronunciation and abbreviation replacements"""
+    replacements = FILIPINO_TEXT_PROCESSING["replacements"]
+    
+    # Sort by length (longest first) to avoid partial replacements
+    sorted_replacements = sorted(replacements.items(), key=lambda x: len(x[0]), reverse=True)
+    
+    for original, replacement in sorted_replacements:
+        # Use word boundaries for most replacements to avoid partial matches
+        if original.isalpha() or original.endswith('.'):
+            # For abbreviations and words, use word boundaries
+            pattern = r'\b' + re.escape(original) + r'\b'
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+        else:
+            # For symbols and other characters, simple replacement
+            text = text.replace(original, replacement)
+    
+    return text
+
+def apply_spell_out_replacements(text):
+    """Apply spell-out replacements for specific terms"""
+    spell_out = FILIPINO_TEXT_PROCESSING["spell_out"]
+    
+    for original, replacement in spell_out.items():
+        # Use word boundaries to match complete terms
+        pattern = r'\b' + re.escape(original) + r'\b'
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    
+    return text
+
+def improve_address_formatting(text):
+    """Improve address formatting to sound more natural"""
+    address_patterns = FILIPINO_TEXT_PROCESSING["address_patterns"]
+    
+    for pattern_config in address_patterns:
+        pattern = pattern_config["pattern"]
+        replacement = pattern_config["replacement"]
+        text = re.sub(pattern, replacement, text)
+    
+    return text
+
+def clean_punctuation(text):
+    """Clean and normalize punctuation for better TTS"""
+    # Remove multiple consecutive punctuation
+    text = re.sub(r'[.]{2,}', '...', text)  # Replace multiple dots with ellipsis
+    text = re.sub(r'[!]{2,}', '!', text)    # Replace multiple exclamations
+    text = re.sub(r'[?]{2,}', '?', text)    # Replace multiple questions
+    
+    # Ensure proper spacing after punctuation
+    text = re.sub(r'([.!?])([A-Za-z])', r'\1 \2', text)
+    text = re.sub(r'([,;])([A-Za-z])', r'\1 \2', text)
+    
+    # Remove parentheses and brackets (often contain production notes)
+    text = re.sub(r'\([^)]*\)', '', text)
+    text = re.sub(r'\[[^\]]*\]', '', text)
+    text = re.sub(r'\{[^}]*\}', '', text)
+    
+    # Clean up extra whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    return text
+
+def remove_production_notes(text):
+    """Remove common production notes and TV directions"""
+    # Common TV production phrases to remove
+    production_phrases = [
+        r'\[.*?\]',  # Anything in brackets
+        r'\(.*?\)',  # Anything in parentheses  
+        r'CUT TO:?.*',
+        r'FADE IN:?.*',
+        r'FADE OUT:?.*',
+        r'VOICE OVER:?.*',
+        r'V\.O\..*',
+        r'ON SCREEN:?.*',
+        r'GRAPHICS:?.*',
+        r'LOWER THIRD:?.*',
+        r'B-ROLL:?.*',
+        r'SOT:?.*',  # Sound on tape
+        r'NAT SOUND:?.*',
+        r'LIVE SHOT:?.*',
+        r'STANDUP:?.*',
+        r'PACKAGE:?.*',
+        r'TEASE:?.*',
+        r'ANCHOR:?.*',
+        r'REPORTER:?.*',
+    ]
+    
+    for phrase_pattern in production_phrases:
+        text = re.sub(phrase_pattern, '', text, flags=re.IGNORECASE)
+    
+    return text
+
+def normalize_numbers_and_time(text):
+    """Normalize numbers and time expressions for Filipino TTS"""
+    # Convert 12-hour time format to Filipino words
+    text = re.sub(r'(\d{1,2}):(\d{2})\s*(AM|PM)', 
+                  lambda m: f"{m.group(1)}:{m.group(2)} {FILIPINO_TEXT_PROCESSING['replacements'].get(m.group(3), m.group(3))}", 
+                  text, flags=re.IGNORECASE)
+    
+    # Convert large numbers to more readable format
+    text = re.sub(r'\b(\d{1,3}),(\d{3})\b', r'\1 libo at \2', text)  # Thousands
+    text = re.sub(r'\b(\d+),(\d{3}),(\d{3})\b', r'\1 milyon \2 libo at \3', text)  # Millions
+    
+    return text
+
+def process_filipino_script(text):
+    """
+    Main function to process and clean Filipino scripts for better TTS pronunciation
+    """
+    print(f"Processing script text...")
+    
+    # Step 1: Remove production notes and TV directions
+    text = remove_production_notes(text)
+    print(f"  - Removed production notes")
+    
+    # Step 2: Clean special characters
+    text = clean_special_characters(text)
+    print(f"  - Cleaned special characters")
+    
+    # Step 3: Apply Filipino-specific replacements
+    text = apply_filipino_replacements(text)
+    print(f"  - Applied Filipino replacements")
+    
+    # Step 4: Apply spell-out replacements
+    text = apply_spell_out_replacements(text)
+    print(f"  - Applied spell-out replacements")
+    
+    # Step 5: Improve address formatting
+    text = improve_address_formatting(text)
+    print(f"  - Improved address formatting")
+    
+    # Step 6: Normalize numbers and time
+    text = normalize_numbers_and_time(text)
+    print(f"  - Normalized numbers and time")
+    
+    # Step 7: Clean punctuation (do this last)
+    text = clean_punctuation(text)
+    print(f"  - Cleaned punctuation")
+    
+    print(f"Script processing complete")
+    return text
 
 def load_news_data():
     """Load news data from generated/news_data.json"""
@@ -66,6 +215,11 @@ def generate_opening_script(time_info):
         
         script = f"{greeting}, {time_info['location']}! It's {time_info['time']} on this {time_info['day']}, {time_info['date']}, here in {time_info['region']}. I'm {time_info['anchor']} with {time_info['station']}, bringing you the latest news and updates from our community."
     
+    # Process the script for Filipino TTS if language is Filipino and USE_REPLACEMENTS is True
+    if LANGUAGE.lower() == "filipino" and USE_REPLACEMENTS:
+        script = process_filipino_script(script)
+        print("Applied Filipino text processing to opening script")
+    
     return {
         "segment_name": "opening_greeting",
         "display_name": SEGMENT_TYPES["opening"]["display_name"],
@@ -74,72 +228,108 @@ def generate_opening_script(time_info):
         "script": script
     }
 
-def generate_summary_script(news_data, time_info):
-    """Generate news summary script using LLM"""
+def generate_summary_scripts(news_data, time_info):
+    """Generate individual news summary scripts using LLM for each news item"""
     if not news_data:
-        return None
+        return []
     
-    # Prepare context for LLM
-    news_context = ""
-    for i, item in enumerate(news_data, 1):
-        news_context += f"News {i}: {item['news']}\n"
+    summary_scripts = []
     
-    prompt = f"""Create a brief news summary script for {STATION_INFO['station_name']} based on these news items:
+    # 1. Generate summary opening segment
+    print("Generating summary opening...")
+    if LANGUAGE.lower() == "filipino":
+        opening_script = "Narito ang mga pangunahing balita sa aming bayan."
+    else:
+        opening_script = "Here are today's top stories from our community."
+    
+    # Process the opening script for Filipino TTS if language is Filipino and USE_REPLACEMENTS is True
+    if LANGUAGE.lower() == "filipino" and USE_REPLACEMENTS:
+        opening_script = process_filipino_script(opening_script)
+        print("Applied Filipino text processing to summary opening")
+    
+    summary_opening = {
+        "segment_name": "summary_opening",
+        "display_name": "News Summary Opening",
+        "display_order": 1,
+        "duration": 5.0,  # Short opening
+        "script": opening_script
+    }
+    summary_scripts.append(summary_opening)
+    
+    # 2. Generate individual summary segments
+    for i, news_item in enumerate(news_data):
+        print(f"Generating summary for news item {i+1}...")
+        
+        prompt = f"""Create a news HEADLINE TITLE for {STATION_INFO['station_name']} for this specific news item:
 
-{news_context}
+News Content: {news_item['news']}
 
 Requirements:
 - Language: Write the script in {LANGUAGE}
-- Duration: approximately {SEGMENT_TYPES['summary']['default_duration']} seconds
-- Professional TV news tone
-- Local Pulilan, Bulacan perspective
-- Brief overview highlighting the main stories
-- Smooth transition to detailed news coverage
-- DO NOT start with greetings (opening already handled that)
-- Start directly with "Narito ang mga pangunahing balita..." or similar
+- Duration: approximately {SEGMENT_TYPES['summary']['default_duration']} seconds per summary
+- Create a proper NEWS HEADLINE TITLE like you'd see on TV news
+- Think of how CNN, BBC, or GMA News headlines work - short, clear, informative titles
+- DO NOT copy snippets from the actual content
+- DO NOT include phrases like "Pakiusap sa mga may-ari" or "Alamin kung paano"
+- Create a TITLE that summarizes what the story is about
+- Local Pulilan, Bulacan perspective when relevant
+- Examples of good headline titles:
+  * "Stray Dog Recovery Program Launched in Multiple Barangays"  
+  * "Women's Agricultural Training Program Success in Peñabatan"
+  * "Rainy Season Preparation Tips Released by Weather Bureau"
+- DO NOT include opening phrases like "Narito ang mga pangunahing balita" (already handled separately)
+- DO NOT include transitions like "Samantala" or "Sa iba pang balita" (keep it clean and direct)
+- Start directly with the headline title
+- Keep it professional and informative
 - IMPORTANT: Generate ONLY the text that the anchor would speak out loud
 - Do NOT include video directions, camera cuts, or production notes
+- Do NOT use abbreviations (spell out LGU, DOH, PNP, etc.)
+- Do NOT use title abbreviations - spell them out: use "Miss" not "Ms.", "Doctor" not "Dr.", "Mister" not "Mr.", "Santo" not "Sto.", etc.
+- Do NOT use special characters or symbols
+- Use simple, clear punctuation only (periods, commas, question marks, exclamation points)
+- When mentioning addresses, use natural conversational format (not robotic like GPS/Waze)
+- Write numbers and dates in word form when possible
 - Output should be ready for text-to-speech conversion
+- Keep it brief and title-like - this is a HEADLINE TITLE, not content
 
-Script (anchor speech only in {LANGUAGE}, no greeting):"""
+Script (anchor headline TITLE only in {LANGUAGE}, professional news title format, no opening phrases or transitions, no abbreviations, spell out all titles):"""
 
-    try:
-        client = openai.OpenAI()
-        response = client.chat.completions.create(
-            model=LLM_CONFIG["model"],
-            messages=[
-                {"role": "system", "content": LLM_CONFIG["system_prompt"]},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=LLM_CONFIG["temperature"],
-            max_tokens=LLM_CONFIG["max_tokens"]
-        )
+        try:
+            client = openai.OpenAI()
+            response = client.chat.completions.create(
+                model=LLM_CONFIG["model"],
+                messages=[
+                    {"role": "system", "content": LLM_CONFIG["system_prompt"]},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=LLM_CONFIG["temperature"],
+                max_tokens=LLM_CONFIG["max_tokens"]
+            )
+            
+            script = response.choices[0].message.content.strip()
+            print(f"Generated summary script for news item {i+1} using LLM")
+            
+        except Exception as e:
+            print(f"Error generating summary script for news item {i+1}: {e}")
+            # Fallback to simple template
+            script = news_item['news'][:150] + ("..." if len(news_item['news']) > 150 else "")
         
-        script = response.choices[0].message.content.strip()
-        print("Generated summary script using LLM")
+        # Process the script for Filipino TTS if language is Filipino and USE_REPLACEMENTS is True
+        if LANGUAGE.lower() == "filipino" and USE_REPLACEMENTS:
+            script = process_filipino_script(script)
+            print(f"Applied Filipino text processing to summary script {i+1}")
         
-        return {
-            "segment_name": "news_summary",
-            "display_name": SEGMENT_TYPES["summary"]["display_name"],
-            "display_order": 1,
+        summary_script = {
+            "segment_name": f"summary{i+1}",
+            "display_name": f"News Summary {i+1}",
+            "display_order": i + 2,  # After opening (0) and summary_opening (1)
             "duration": SEGMENT_TYPES["summary"]["default_duration"],
             "script": script
         }
-    except Exception as e:
-        print(f"Error generating summary script: {e}")
-        # Fallback to simple template
-        if LANGUAGE.lower() == "filipino":
-            fallback_script = f"Narito ang mga pangunahing balita ngayong araw mula sa {time_info['location']} at mga karatig lugar sa {time_info['region']}."
-        else:
-            fallback_script = f"Here are today's top stories from {time_info['location']} and surrounding areas in {time_info['region']}."
         
-        return {
-            "segment_name": "news_summary",
-            "display_name": SEGMENT_TYPES["summary"]["display_name"],
-            "display_order": 1,
-            "duration": SEGMENT_TYPES["summary"]["default_duration"],
-            "script": fallback_script
-        }
+        summary_scripts.append(summary_script)
+    
+    return summary_scripts
 
 def generate_news_scripts(news_data, time_info):
     """Generate individual news story scripts using LLM"""
@@ -182,9 +372,15 @@ Requirements:
 - Do NOT include video directions, camera cuts, or production notes
 - Do NOT include bracketed instructions like [Opening Shot] or [Cut to]
 - Do NOT include quoted speech from other people - paraphrase their statements
+- Do NOT use abbreviations (spell out LGU, DOH, PNP, etc.)
+- Do NOT use title abbreviations - spell them out: use "Miss" not "Ms.", "Doctor" not "Dr.", "Mister" not "Mr.", "Santo" not "Sto.", etc.
+- Do NOT use special characters or symbols
+- Use simple, clear punctuation only (periods, commas, question marks, exclamation points)
+- When mentioning addresses, use natural conversational format (not robotic like GPS/Waze)
+- Write numbers and dates in word form when possible
 - Output should be ready for text-to-speech conversion
 
-Script (anchor speech only in {LANGUAGE}, no greeting, smooth transition):"""
+Script (anchor speech only in {LANGUAGE}, no greeting, smooth transition, no abbreviations, spell out all titles):"""
 
         try:
             client = openai.OpenAI()
@@ -209,10 +405,15 @@ Script (anchor speech only in {LANGUAGE}, no greeting, smooth transition):"""
             else:
                 script = f"In other news, {news_item['news']}"
         
+        # Process the script for Filipino TTS if language is Filipino and USE_REPLACEMENTS is True
+        if LANGUAGE.lower() == "filipino" and USE_REPLACEMENTS:
+            script = process_filipino_script(script)
+            print(f"Applied Filipino text processing to news script {i+1}")
+        
         news_script = {
             "segment_name": f"news{i+1}",
             "display_name": f"News Story {i+1}",
-            "display_order": i + 2,  # After opening and summary
+            "display_order": i + 100,  # After opening, summary_opening, and summaries, using 100+ to ensure they come after all summaries
             "duration": SEGMENT_TYPES["news"]["default_duration"],
             "script": script
         }
@@ -227,6 +428,11 @@ def generate_closing_script(time_info):
         script = f"Iyan muna ang mga balita ngayong araw mula sa {time_info['station']}. Salamat sa inyong pakikinig dito sa {time_info['location']}, {time_info['region']}. Ako si {time_info['anchor']}, at makikita namin kayo sa susunod na ulat. Magkaroon kayo ng magandang araw!"
     else:
         script = f"That's all for now from {time_info['station']}. Thank you for staying informed with us here in {time_info['location']}, {time_info['region']}. I'm {time_info['anchor']}, and we'll see you next time. Have a great day!"
+    
+    # Process the script for Filipino TTS if language is Filipino and USE_REPLACEMENTS is True
+    if LANGUAGE.lower() == "filipino" and USE_REPLACEMENTS:
+        script = process_filipino_script(script)
+        print("Applied Filipino text processing to closing script")
     
     return {
         "segment_name": "closing_remarks",
@@ -268,12 +474,11 @@ def main():
     opening = generate_opening_script(time_info)
     scripts.append(opening)
     
-    # 2. News summary (if there are news items)
+    # 2. News summaries (if there are news items)
     if news_data:
-        print("Generating news summary...")
-        summary = generate_summary_script(news_data, time_info)
-        if summary:
-            scripts.append(summary)
+        print("Generating news summaries...")
+        summaries = generate_summary_scripts(news_data, time_info)
+        scripts.extend(summaries)
     
     # 3. Individual news stories
     if news_data:

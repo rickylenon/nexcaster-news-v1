@@ -524,8 +524,8 @@
                             </div>
                         </div>
 
-                        {% if news_item.media %}
-                            <div class="media-section">
+                        <div class="media-section">
+                            {% if news_item.media %}
                                 <div class="media-list-display">
                                     {% for media in news_item.media %}
                                         {% if media.image %}
@@ -549,12 +549,18 @@
                                         {% endif %}
                                     {% endfor %}
                                 </div>
-                                
-                                <div class="media-list-edit" style="display: none;">
-                                    <div class="edit-media-container" id="edit-media-{{ loop.index0 }}">
-                                        <h4>📎 Edit Media Files:</h4>
-                                        
-                                        <!-- Existing Media -->
+                            {% else %}
+                                <div class="media-list-display">
+                                    <span style="color: #666; font-style: italic;">📷 No media files attached</span>
+                                </div>
+                            {% endif %}
+                            
+                            <div class="media-list-edit" style="display: none;">
+                                <div class="edit-media-container" id="edit-media-{{ loop.index0 }}">
+                                    <h4>📎 Edit Media Files:</h4>
+                                    
+                                    <!-- Existing Media -->
+                                    {% if news_item.media %}
                                         <div class="existing-media">
                                             {% for media in news_item.media %}
                                                 {% if media.image %}
@@ -581,29 +587,33 @@
                                                 {% endif %}
                                             {% endfor %}
                                         </div>
-                                        
-                                        <!-- Add New Files -->
-                                        <div class="add-new-media">
-                                            <label>Add New Files:</label>
-                                            <input type="file" multiple accept=".png,.jpg,.jpeg,.gif,.bmp,.webp,.mp4,.avi,.mov,.webm,.mkv,.flv" 
-                                                   class="new-media-files" id="new-media-{{ loop.index0 }}">
-                                            <div class="new-file-preview" id="new-preview-{{ loop.index0 }}"></div>
+                                    {% else %}
+                                        <div class="existing-media">
+                                            <p style="color: #666; font-style: italic; margin: 10px 0;">No existing media files.</p>
                                         </div>
-                                        
-                                        <!-- Add New Links -->
-                                        <div class="add-new-links">
-                                            <label>Add New Links:</label>
-                                            <div class="new-links-container" id="new-links-{{ loop.index0 }}">
-                                                <div class="link-input">
-                                                    <input type="url" class="new-link-input" placeholder="https://example.com/image.jpg">
-                                                    <button type="button" class="btn btn-success btn-small" onclick="addNewLinkToEdit({{ loop.index0 }}, event)">+ Add</button>
-                                                </div>
+                                    {% endif %}
+                                    
+                                    <!-- Add New Files -->
+                                    <div class="add-new-media">
+                                        <label>Add New Files:</label>
+                                        <input type="file" multiple accept=".png,.jpg,.jpeg,.gif,.bmp,.webp,.mp4,.avi,.mov,.webm,.mkv,.flv" 
+                                               class="new-media-files" id="new-media-{{ loop.index0 }}">
+                                        <div class="new-file-preview" id="new-preview-{{ loop.index0 }}"></div>
+                                    </div>
+                                    
+                                    <!-- Add New Links -->
+                                    <div class="add-new-links">
+                                        <label>Add New Links:</label>
+                                        <div class="new-links-container" id="new-links-{{ loop.index0 }}">
+                                            <div class="link-input">
+                                                <input type="url" class="new-link-input" placeholder="https://example.com/image.jpg">
+                                                <button type="button" class="btn btn-success btn-small" onclick="addNewLinkToEdit({{ loop.index0 }}, event)">+ Add</button>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        {% endif %}
+                        </div>
 
                         {% if news_item.upload_summary %}
                             <div class="upload-summary">

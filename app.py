@@ -1,6 +1,6 @@
 import os
 import json
-from flask import Flask, request, render_template, redirect, url_for, flash, jsonify, send_from_directory
+from flask import Flask, request, render_template, redirect, url_for, flash, jsonify, send_from_directory, render_template_string
 from werkzeug.utils import secure_filename
 import uuid
 from datetime import datetime
@@ -366,9 +366,168 @@ def delete_media(news_index, media_filename):
         print(f"Error deleting media file {media_filename}: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/player')
+@app.route('/player/')
+def news_player():
+    """Serve the news media player interface"""
+    try:
+        # Check if news_player.html exists
+        if os.path.exists('news_player.html'):
+            print("📺 Serving news media player interface")
+            return send_from_directory('.', 'news_player.html')
+        else:
+            print("❌ news_player.html file not found")
+            return render_template_string("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>News Media Player - File Not Found</title>
+                <style>
+                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                    .error { color: #dc3545; }
+                    .info { color: #007bff; margin-top: 20px; }
+                </style>
+            </head>
+            <body>
+                <h1 class="error">⚠️ News Media Player Not Found</h1>
+                <p>The news_player.html file is missing.</p>
+                <div class="info">
+                    <h3>Available Endpoints:</h3>
+                    <p><a href="/">News Upload Interface</a></p>
+                    <p><a href="/api/news-data">News Data API</a></p>
+                    <p><a href="/api/news/manifest">News Manifest API</a></p>
+                </div>
+            </body>
+            </html>
+            """), 404
+    except Exception as e:
+        print(f"❌ Error serving news media player: {str(e)}")
+        return jsonify({'error': 'Failed to serve news media player interface'}), 500
+
+@app.route('/api/news/manifest')
+def get_news_manifest():
+    """API endpoint to get news manifest for media player"""
+    try:
+        manifest_path = os.path.join(GENERATED_FOLDER, 'news_manifest.json')
+        if os.path.exists(manifest_path):
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                manifest = json.load(f)
+            
+            # Add API metadata
+            manifest['api_metadata'] = {
+                'served_at': datetime.now().isoformat(),
+                'server': 'Nexcaster News API v1.0',
+                'endpoint': '/api/news/manifest'
+            }
+            
+            segments = manifest.get('individual_segments', [])
+            segment_types = {}
+            for segment in segments:
+                segment_name = segment.get('segment_name', 'unknown')
+                if segment_name.startswith('summary'):
+                    if segment_name == 'summary_opening':
+                        segment_types['summary_opening'] = segment_types.get('summary_opening', 0) + 1
+                    else:
+                        segment_types['summary_headlines'] = segment_types.get('summary_headlines', 0) + 1
+                elif segment_name.startswith('news'):
+                    segment_types['news_stories'] = segment_types.get('news_stories', 0) + 1
+                elif segment_name in ['opening_greeting', 'closing_remarks']:
+                    segment_types['greetings'] = segment_types.get('greetings', 0) + 1
+                else:
+                    segment_types['other'] = segment_types.get('other', 0) + 1
+            
+            print(f"✅ Served news manifest with {len(segments)} segments:")
+            for segment_type, count in segment_types.items():
+                print(f"   - {segment_type}: {count}")
+            
+            return jsonify(manifest)
+        else:
+            print("❌ News manifest not found")
+            return jsonify({
+                'error': 'News manifest not found',
+                'message': 'Run TTS generation to create the manifest',
+                'timestamp': datetime.now().isoformat()
+            }), 404
+    except Exception as e:
+        print(f"❌ Error getting news manifest: {e}")
+        return jsonify({
+            'error': 'Failed to load news manifest',
+            'details': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/health')
+def health_check():
+    """Health check endpoint for news application"""
+    try:
+        news_data = load_news_data()
+        manifest_exists = os.path.exists(os.path.join(GENERATED_FOLDER, 'news_manifest.json'))
+        audio_dir_exists = os.path.exists(os.path.join(GENERATED_FOLDER, 'audio'))
+        
+        # Count audio files
+        audio_files = 0
+        if audio_dir_exists:
+            audio_files = len([f for f in os.listdir(os.path.join(GENERATED_FOLDER, 'audio')) 
+                             if f.endswith('.mp3')])
+        
+        # Count media files
+        media_files = len([f for f in os.listdir(UPLOAD_FOLDER) 
+                          if os.path.isfile(os.path.join(UPLOAD_FOLDER, f))])
+        
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'server': 'Nexcaster News API v1.0',
+            'news_items': len(news_data),
+            'manifest_available': manifest_exists,
+            'audio_files': audio_files,
+            'media_files': media_files,
+            'directories': {
+                'upload_folder': UPLOAD_FOLDER,
+                'generated_folder': GENERATED_FOLDER,
+                'audio_folder': os.path.join(GENERATED_FOLDER, 'audio')
+            },
+            'endpoints': {
+                'news_upload': url_for('index', _external=True),
+                'news_player': url_for('news_player', _external=True),
+                'news_data': url_for('get_news_data', _external=True),
+                'news_manifest': url_for('get_news_manifest', _external=True),
+                'health_check': url_for('health_check', _external=True)
+            }
+        })
+    except Exception as e:
+        print(f"❌ Health check failed: {e}")
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+@app.route('/generated/<path:filename>')
+def serve_generated_files(filename):
+    """Serve generated files (audio, manifest, etc.)"""
+    try:
+        print(f"📁 Serving generated file: {filename}")
+        return send_from_directory(GENERATED_FOLDER, filename)
+    except Exception as e:
+        print(f"❌ Error serving generated file {filename}: {e}")
+        return jsonify({
+            'error': f'File "{filename}" not found',
+            'timestamp': datetime.now().isoformat()
+        }), 404
+
 if __name__ == '__main__':
-    print("Starting Nexcaster News Report Generator...")
-    print(f"Upload folder: {UPLOAD_FOLDER}")
-    print(f"Generated folder: {GENERATED_FOLDER}")
-    print("Access the application at: http://localhost:5001")
+    print("🚀 Starting Nexcaster News App...")
+    print(f"📁 Upload folder: {UPLOAD_FOLDER}")
+    print(f"📁 Generated folder: {GENERATED_FOLDER}")
+    print("🌐 Server will be available at: http://localhost:5001")
+    print("📝 Upload news content and generate audio at: http://localhost:5001/")
+    print("📺 News Media Player at: http://localhost:5001/player")
+    print("📊 API Endpoints:")
+    print("   GET /api/news-data        - News data")
+    print("   GET /api/news/manifest    - News manifest for player")
+    print("   GET /api/health           - Health check")
+    print("   GET /generated/<file>     - Generated audio/manifest files")
+    print("   GET /media/<file>         - Media files (images/videos)")
+    
     app.run(debug=True, host='0.0.0.0', port=5001) 

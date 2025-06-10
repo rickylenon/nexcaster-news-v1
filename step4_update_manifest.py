@@ -65,22 +65,35 @@ def map_media_to_segments(manifest, news_data):
             })
             print(f"  ✅ Added outro.mp4")
             
-        elif segment_name == 'news_summary':
-            # For summary, add one image from each news story that has media
-            print(f"  📊 Adding summary images from news stories...")
-            for i, news_item in enumerate(news_data):
-                if news_item.get('media') and len(news_item['media']) > 0:
-                    # Take first image from each news story
-                    first_image = news_item['media'][0]
-                    segment['media'].append({
-                        "image": first_image['image'],
-                        "path": f"media/{first_image['image']}",
-                        "type": "summary_image",
-                        "news_index": i + 1,
-                        "original_name": first_image.get('original_name', ''),
-                        "size_mb": first_image.get('size_mb', 0)
-                    })
-                    print(f"    - Added image from news {i+1}: {first_image['image'][:30]}...")
+        elif segment_name == 'summary_opening':
+            # No media for summary opening - it's just the introduction
+            print(f"  📢 Summary opening - no media needed")
+            
+        elif segment_name.startswith('summary'):
+            # Extract summary number (summary1 -> 1, summary2 -> 2, etc.)
+            try:
+                summary_index = int(segment_name.replace('summary', '')) - 1  # Convert to 0-based index
+                if summary_index < len(news_data):
+                    news_item = news_data[summary_index]
+                    
+                    # Add first media from corresponding news item for summary
+                    if news_item.get('media') and len(news_item['media']) > 0:
+                        first_image = news_item['media'][0]
+                        segment['media'].append({
+                            "image": first_image['image'],
+                            "path": f"media/{first_image['image']}",
+                            "type": "summary_image",
+                            "news_index": summary_index + 1,
+                            "original_name": first_image.get('original_name', ''),
+                            "size_mb": first_image.get('size_mb', 0)
+                        })
+                        print(f"  ✅ Added summary image: {first_image['image'][:30]}...")
+                    else:
+                        print(f"  ⚠️  No media found for summary {summary_index + 1}")
+                else:
+                    print(f"  ⚠️  Summary index {summary_index + 1} not found in news data")
+            except ValueError:
+                print(f"  ❌ Could not extract summary index from {segment_name}")
             
         elif segment_name.startswith('news'):
             # Extract news number (news1 -> 1, news2 -> 2, etc.)
