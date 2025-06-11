@@ -119,29 +119,72 @@
             display: none;
         }
 
-        .media-info {
+        .lower-third {
             position: absolute;
-            bottom: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.8);
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 0.9em;
-            max-width: 300px;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            border-top: 3px solid #fff;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            animation: slideInUp 0.5s ease-out;
         }
 
-        .media-info h4 {
-            margin-bottom: 5px;
-            color: #3498db;
+        @keyframes slideInUp {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
         }
 
-        .media-info p {
+        .lower-third-content {
+            padding: 12px 20px;
+            color: white;
+        }
+
+        .lower-third-category {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 4px;
-            color: #aaa;
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
+            font-size: 0.75em;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .lower-third-category #newsCategory {
+            background: rgba(255,255,255,0.2);
+            padding: 2px 8px;
+            border-radius: 3px;
+        }
+
+        .lower-third-category #newsTimestamp {
+            background: #27ae60;
+            padding: 2px 8px;
+            border-radius: 3px;
+            animation: pulse 1.5s infinite;
+        }
+
+        .lower-third-headline {
+            font-size: 1em;
+            font-weight: bold;
+            line-height: 1.2;
+            margin-bottom: 4px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .lower-third-location {
+            font-size: 0.8em;
+            opacity: 0.9;
+            font-weight: 500;
         }
 
         .playlist-panel {
@@ -326,8 +369,6 @@
             margin-top: 20px;
         }
 
-
-
         .volume-group {
             display: flex;
             align-items: center;
@@ -488,10 +529,19 @@
                 
                 <img id="mainImage" class="main-image" alt="News Image">
 
-                <div id="mediaInfo" class="media-info" style="display: none;">
-                    <h4 id="mediaTitle">News Segment</h4>
-                    <p id="mediaDescription">News content will appear here</p>
-                    <p><small>Time: <span id="mediaTime">00:00 - 00:00</span></small></p>
+                <div id="lowerThird" class="lower-third" style="display: none;">
+                    <div class="lower-third-content">
+                        <div class="lower-third-category">
+                            <span id="newsCategory">Breaking News</span>
+                            <span id="newsTimestamp">LIVE</span>
+                        </div>
+                        <div class="lower-third-headline" id="newsHeadline">
+                            News headline will appear here
+                        </div>
+                        <div class="lower-third-location" id="newsLocation">
+                            Pulilan, Bulacan
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -559,7 +609,6 @@
                 </div>
             </div>
 
-
         </div>
 
         <div id="debugPanel" class="debug-panel" style="display: none;">
@@ -588,6 +637,7 @@
                 this.activeSegment = null;
                 this.debugMode = false;
                 this.isLoading = false;
+                this.pendingMediaSegment = null;
                 
                 // Media rotation
                 this.imageRotationInterval = null;
@@ -663,6 +713,13 @@
                 this.reloadBtn.addEventListener('click', () => this.reload());
                 this.debugBtn.addEventListener('click', () => this.toggleDebug());
                 
+                // Keyboard shortcuts for debugging
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'd' || e.key === 'D') {
+                        this.dumpTimingState();
+                    }
+                });
+                
                 // Timeline interaction
                 this.timelineBar.addEventListener('click', (e) => this.seekToPosition(e));
                 
@@ -697,10 +754,14 @@
                     this.segments = [];
                     let cumulativeTime = 0;
                     
+                    this.log('info', '📊 PROCESSING MANIFEST SEGMENTS:');
+                    
                     for (const segment of this.manifest.individual_segments) {
                         // Use pre-calculated timing if available, otherwise calculate
                         const startTime = segment.start_time !== undefined ? segment.start_time : cumulativeTime;
                         const endTime = segment.end_time !== undefined ? segment.end_time : startTime + segment.duration;
+                        
+                        this.log('info', `📺 Segment: "${segment.display_name}" | ${this.formatTime(startTime)}-${this.formatTime(endTime)} (${segment.duration.toFixed(3)}s) | Media: ${segment.media ? segment.media.length : 0} items`);
                         
                         this.segments.push({
                             name: segment.segment_type,
@@ -713,7 +774,8 @@
                             audio_path: segment.audio_path,
                             media: segment.media || [],
                             voice_used: segment.voice_used,
-                            language: segment.language
+                            language: segment.language,
+                            headline: segment.headline || null
                         });
                         
                         cumulativeTime = endTime;
@@ -925,7 +987,7 @@
             }
             
             async play() {
-                this.log('info', 'Starting playback...');
+                this.log('info', '▶️ STARTING PLAYBACK...');
                 
                 try {
                     this.isLoading = true;
@@ -933,9 +995,13 @@
                     this.pauseBtn.disabled = false;
                     this.stopBtn.disabled = false;
                     
+                    // Log current position
+                    const startTime = this.newsAudio.currentTime;
+                    this.log('info', `📍 Starting from: ${this.formatTime(startTime)} / ${this.formatTime(this.totalDuration)}`);
+                    
                     // Ensure news audio is ready
                     if (this.newsAudio.readyState < 3) {
-                        this.log('info', 'Waiting for news audio to be ready...');
+                        this.log('info', '⏳ Waiting for news audio to be ready...');
                         await new Promise((resolve) => {
                             const onReady = () => {
                                 this.newsAudio.removeEventListener('canplaythrough', onReady);
@@ -949,21 +1015,22 @@
                     this.isLoading = false;
                     
                     await this.newsAudio.play();
+                    this.log('info', `🎵 News audio started at ${this.formatTime(this.newsAudio.currentTime)}`);
                     
                     // Handle background music
                     if (this.backgroundAudio.src) {
                         this.backgroundAudio.currentTime = this.newsAudio.currentTime;
                         await this.backgroundAudio.play();
-                        this.log('info', `Background music started at ${this.formatTime(this.newsAudio.currentTime)}`);
+                        this.log('info', `🎵 Background music started at ${this.formatTime(this.newsAudio.currentTime)}`);
                         
                         // Duck background music when news audio starts
                         this.duckBackgroundMusic();
                     }
                     
-                    this.log('info', 'Playback started successfully');
+                    this.log('info', '✅ Playback started successfully');
                     
                 } catch (error) {
-                    this.log('error', `Playback failed: ${error.message}`);
+                    this.log('error', `❌ Playback failed: ${error.message}`);
                     this.isPlaying = false;
                     this.isLoading = false;
                     this.playBtn.disabled = false;
@@ -992,6 +1059,7 @@
                 
                 this.isPlaying = false;
                 this.activeSegment = null;
+                this.pendingMediaSegment = null; // Clear any pending media display
                 
                 // Clear image rotation
                 this.clearImageRotation();
@@ -1052,39 +1120,70 @@
                 
                 this.currentTime = this.newsAudio.currentTime;
                 
+                // Enhanced timing logs
+                const audioTime = this.newsAudio.currentTime;
+                const formattedTime = this.formatTime(audioTime);
+                
+                // Check for pending media display - display media when audio actually reaches segment start
+                if (this.pendingMediaSegment && audioTime >= this.pendingMediaSegment.start_time) {
+                    this.log('info', `⏰ Audio caught up! Displaying media for "${this.pendingMediaSegment.display_name}" at ${formattedTime}`);
+                    this.displaySegmentMediaForActiveSegment(this.pendingMediaSegment);
+                    this.pendingMediaSegment = null; // Clear pending
+                }
+                
                 // Find current segment based on audio time
                 const currentSegment = this.segments.find(segment => 
                     this.currentTime >= segment.start_time && 
                     this.currentTime <= segment.end_time
                 );
                 
-                // Handle segment changes
+                // Log detailed timing every few seconds (to avoid spam)
+                if (Math.floor(audioTime) % 3 === 0 && Math.floor(audioTime * 10) % 10 === 0) {
+                    const segmentInfo = currentSegment ? 
+                        `${currentSegment.display_name} (${this.formatTime(currentSegment.start_time)}-${this.formatTime(currentSegment.end_time)})` : 
+                        'No active segment';
+                    this.log('info', `⏱️ Playback: ${formattedTime} | Segment: ${segmentInfo}`);
+                }
+                
+                // Handle segment changes with detailed timing
                 if (currentSegment !== this.activeSegment) {
+                    const previousSegmentName = this.activeSegment ? this.activeSegment.display_name : 'none';
+                    const newSegmentName = currentSegment ? currentSegment.display_name : 'none';
+                    
+                    this.log('info', `🔄 SEGMENT TRANSITION at ${formattedTime}: "${previousSegmentName}" → "${newSegmentName}"`);
+                    
                     if (this.activeSegment) {
+                        const segmentEndTime = this.formatTime(this.activeSegment.end_time);
+                        const timingDiff = audioTime - this.activeSegment.end_time;
+                        this.log('info', `🔚 Deactivating: "${this.activeSegment.display_name}" | Expected end: ${segmentEndTime} | Timing diff: ${timingDiff.toFixed(3)}s`);
                         this.deactivateSegment(this.activeSegment);
                     }
+                    
                     if (currentSegment) {
+                        const segmentStartTime = this.formatTime(currentSegment.start_time);
+                        const timingDiff = audioTime - currentSegment.start_time;
+                        this.log('info', `🎬 Activating: "${currentSegment.display_name}" | Expected start: ${segmentStartTime} | Timing diff: ${timingDiff.toFixed(3)}s`);
                         this.activateSegment(currentSegment);
                     }
+                    
                     this.activeSegment = currentSegment;
-                    this.log('info', `Segment changed to: ${currentSegment ? currentSegment.display_name : 'none'}`);
                 }
                 
                 // Update UI
                 this.updateTimeline();
                 this.updateActivePlaylistItems();
-                this.updateMediaInfo(currentSegment);
+                this.updateLowerThird(currentSegment);
             }
             
-
-            
             async activateSegment(segment) {
-                this.log('info', `Activating segment: ${segment.display_name}`);
+                const activationTime = this.newsAudio.currentTime;
+                this.log('info', `🎬 ACTIVATING SEGMENT: "${segment.display_name}" at ${this.formatTime(activationTime)}`);
+                this.log('info', `📊 Segment timing: Start=${this.formatTime(segment.start_time)} | End=${this.formatTime(segment.end_time)} | Duration=${segment.duration.toFixed(3)}s`);
                 
                 try {
                     // Handle outro segments with individual audio playback
                     if (segment._isOutro) {
-                        this.log('info', `Playing outro audio: ${segment.audio_path}`);
+                        this.log('info', `🎵 Playing outro audio: ${segment.audio_path}`);
                         this.segmentAudio.src = segment.audio_path;
                         this.segmentAudio.currentTime = 0;
                         await this.segmentAudio.play();
@@ -1096,37 +1195,70 @@
                     // Clear any existing image rotation
                     this.clearImageRotation();
                     
-                    // Handle media display
-                    if (segment.media && segment.media.length > 0) {
-                        await this.displaySegmentMedia(segment);
-                        
-                        // Start image rotation if segment has multiple images
-                        const images = segment.media.filter(m => m.image);
-                        if (images.length > 1) {
-                            this.startImageRotation(segment, images);
-                        }
+                    // IMPORTANT: Only display media if audio has actually reached the segment start time
+                    // This prevents media from showing before audio starts for that segment
+                    const audioTime = this.newsAudio.currentTime;
+                    if (audioTime >= segment.start_time) {
+                        this.log('info', `✅ Audio time (${this.formatTime(audioTime)}) >= segment start (${this.formatTime(segment.start_time)}) - displaying media`);
+                        await this.displaySegmentMediaForActiveSegment(segment);
                     } else {
-                        // Hide media if no media for this segment (e.g., summary_opening)
-                        this.mainVideo.style.display = 'none';
-                        this.mainImage.style.display = 'none';
-                        
-                        // Log different messages for different segment types
-                        if (segment.name === 'summary_opening') {
-                            this.log('info', `${segment.display_name} - Introduction segment (no media needed)`);
-                        } else {
-                            this.log('info', `${segment.display_name} - No media available for this segment`);
-                        }
+                        this.log('info', `⏳ Audio time (${this.formatTime(audioTime)}) < segment start (${this.formatTime(segment.start_time)}) - delaying media display`);
+                        // Store segment for media display when audio catches up
+                        this.pendingMediaSegment = segment;
                     }
+                    
                 } catch (error) {
-                    this.log('warning', `Failed to activate segment media: ${error.message}`);
+                    this.log('error', `❌ Failed to activate segment "${segment.display_name}": ${error.message}`);
+                }
+            }
+            
+            async displaySegmentMediaForActiveSegment(segment) {
+                // Handle media display with detailed logging
+                if (segment.media && segment.media.length > 0) {
+                    this.log('info', `🖼️ Processing ${segment.media.length} media items for "${segment.display_name}"`);
+                    await this.displaySegmentMedia(segment);
+                    
+                    // Start image rotation if segment has multiple images
+                    const images = segment.media.filter(m => m.image);
+                    if (images.length > 1) {
+                        this.log('info', `🔄 Starting image rotation: ${images.length} images for "${segment.display_name}"`);
+                        this.startImageRotation(segment, images);
+                    } else if (images.length === 1) {
+                        this.log('info', `🖼️ Single image display for "${segment.display_name}": ${images[0].image}`);
+                    }
+                } else {
+                    // Hide media if no media for this segment (e.g., summary_opening)
+                    this.log('info', `📺 Hiding media elements - no media for "${segment.display_name}"`);
+                    this.mainVideo.style.display = 'none';
+                    this.mainImage.style.display = 'none';
+                    
+                    // Log different messages for different segment types
+                    if (segment.name === 'summary_opening' || segment.name === 'headline_opening') {
+                        this.log('info', `📢 Introduction segment "${segment.display_name}" - no media required`);
+                    } else {
+                        this.log('warning', `⚠️ No media available for "${segment.display_name}"`);
+                    }
                 }
             }
             
             deactivateSegment(segment) {
-                this.log('info', `Deactivating segment: ${segment.display_name}`);
+                const deactivationTime = this.newsAudio.currentTime;
+                this.log('info', `🔚 DEACTIVATING SEGMENT: "${segment.display_name}" at ${this.formatTime(deactivationTime)}`);
+                
+                // Calculate and log timing accuracy
+                const expectedEndTime = segment.end_time;
+                const timingDrift = deactivationTime - expectedEndTime;
+                const driftMs = Math.round(timingDrift * 1000);
+                
+                if (Math.abs(timingDrift) > 0.1) {
+                    this.log('warning', `⏰ TIMING DRIFT: "${segment.display_name}" ended ${Math.abs(driftMs)}ms ${timingDrift > 0 ? 'late' : 'early'}`);
+                } else {
+                    this.log('info', `⏰ Excellent timing: "${segment.display_name}" drift: ${driftMs}ms`);
+                }
                 
                 // Handle outro segments
                 if (segment._isOutro) {
+                    this.log('info', `🎵 Stopping outro audio for "${segment.display_name}"`);
                     this.segmentAudio.pause();
                     
                     // Restore background music when outro ends
@@ -1135,21 +1267,31 @@
                 
                 // Clear image rotation when segment ends
                 this.clearImageRotation();
+                
+                this.log('info', `✅ Segment "${segment.display_name}" deactivated successfully`);
             }
             
             startImageRotation(segment, images) {
                 // Image index is already set to 0 in displaySegmentMedia
+                const rotationStartTime = this.newsAudio.currentTime;
                 
                 // Calculate rotation interval (show each image for segment_duration / image_count)
                 // For longer segments, allow more time per image. Min 3s, max 15s per image
                 const baseInterval = segment.duration * 1000 / images.length;
                 const rotationInterval = Math.max(3000, Math.min(15000, baseInterval));
                 
-                this.log('info', `Starting image rotation for ${segment.display_name}: ${images.length} images, ${(rotationInterval/1000).toFixed(1)}s each (segment: ${segment.duration.toFixed(1)}s)`);
+                this.log('info', `🔄 STARTING IMAGE ROTATION for "${segment.display_name}" at ${this.formatTime(rotationStartTime)}`);
+                this.log('info', `📊 Rotation config: ${images.length} images, ${(rotationInterval/1000).toFixed(1)}s each (segment: ${segment.duration.toFixed(1)}s)`);
+                
+                // Log all images that will be rotated
+                images.forEach((img, index) => {
+                    this.log('info', `📸 Image ${index + 1}/${images.length}: ${img.image}`);
+                });
                 
                 // Only start rotation if there are multiple images
                 if (images.length > 1) {
                     this.imageRotationInterval = setInterval(() => {
+                        const rotationTime = this.newsAudio.currentTime;
                         this.currentImageIndex = (this.currentImageIndex + 1) % images.length;
                         const selectedImage = images[this.currentImageIndex];
                         
@@ -1161,41 +1303,49 @@
                             imagePath = imagePath.startsWith('media/') ? '/' + imagePath : '/media/' + imagePath;
                         }
                         this.mainImage.src = imagePath;
-                        this.log('info', `Rotated to image ${this.currentImageIndex + 1}/${images.length}: ${selectedImage.image}`);
+                        this.log('info', `🔄 ROTATED to image ${this.currentImageIndex + 1}/${images.length}: "${selectedImage.image}" at ${this.formatTime(rotationTime)}`);
                     }, rotationInterval);
                 } else {
-                    this.log('info', `Only 1 image in ${segment.display_name} - no rotation needed`);
+                    this.log('info', `📸 Single image mode - no rotation needed for "${segment.display_name}"`);
                 }
             }
             
             clearImageRotation() {
                 if (this.imageRotationInterval) {
+                    const clearTime = this.newsAudio.currentTime;
                     clearInterval(this.imageRotationInterval);
                     this.imageRotationInterval = null;
-                    this.log('info', 'Image rotation cleared');
+                    this.log('info', `🛑 Image rotation cleared at ${this.formatTime(clearTime)}`);
                 }
             }
             
             async displaySegmentMedia(segment) {
+                const displayTime = this.newsAudio.currentTime;
+                
                 if (!segment.media || segment.media.length === 0) {
                     // No media for this segment - hide both video and image
                     this.mainVideo.style.display = 'none';
                     this.mainImage.style.display = 'none';
-                    this.log('info', `No media for segment: ${segment.display_name}`);
+                    this.log('info', `📺 No media to display for segment: "${segment.display_name}" at ${this.formatTime(displayTime)}`);
                     return;
                 }
                 
-                this.log('info', `Processing media for segment: ${segment.display_name} (${segment.media.length} items)`);
+                this.log('info', `🖼️ DISPLAYING MEDIA for "${segment.display_name}" at ${this.formatTime(displayTime)}`);
+                this.log('info', `📊 Media inventory: ${segment.media.length} total items`);
                 
                 // Prioritize videos first, then images
                 const videos = segment.media.filter(m => m.video);
                 const images = segment.media.filter(m => m.image);
                 
+                this.log('info', `📹 Videos: ${videos.length} | 🖼️ Images: ${images.length}`);
+                
                 if (videos.length > 0) {
                     // Display first video
                     const media = videos[0];
+                    this.log('info', `🎬 Switching to VIDEO mode: "${media.video}"`);
                     this.mainImage.style.display = 'none';
                     this.mainVideo.style.display = 'block';
+                    
                     // Ensure absolute path for video
                     let videoPath = media.path;
                     if (!videoPath.startsWith('/')) {
@@ -1203,18 +1353,21 @@
                         // Otherwise assume it's just a filename and prepend '/media/'
                         videoPath = videoPath.startsWith('media/') ? '/' + videoPath : '/media/' + videoPath;
                     }
+                    
+                    this.log('info', `📹 Loading video: ${videoPath}`);
                     this.mainVideo.src = videoPath;
                     await this.mainVideo.play();
-                    this.log('info', `Playing video: ${media.video}`);
+                    this.log('info', `✅ Video playing: "${media.video}" at ${this.formatTime(this.newsAudio.currentTime)}`);
                     
                 } else if (images.length > 0) {
                     // Always start with the first image when segment begins
                     this.currentImageIndex = 0;
                     const selectedImage = images[0];
                     
-                    // Display first image
+                    this.log('info', `🖼️ Switching to IMAGE mode: "${selectedImage.image}" (1 of ${images.length})`);
                     this.mainVideo.style.display = 'none';
                     this.mainImage.style.display = 'block';
+                    
                     // Ensure absolute path for image
                     let imagePath = selectedImage.path;
                     if (!imagePath.startsWith('/')) {
@@ -1222,8 +1375,14 @@
                         // Otherwise assume it's just a filename and prepend '/media/'
                         imagePath = imagePath.startsWith('media/') ? '/' + imagePath : '/media/' + imagePath;
                     }
+                    
+                    this.log('info', `🖼️ Loading image: ${imagePath}`);
                     this.mainImage.src = imagePath;
-                    this.log('info', `Displaying image: ${selectedImage.image}`);
+                    this.log('info', `✅ Image displayed: "${selectedImage.image}" at ${this.formatTime(this.newsAudio.currentTime)}`);
+                } else {
+                    this.log('warning', `⚠️ No displayable media found for "${segment.display_name}" - hiding all media elements`);
+                    this.mainVideo.style.display = 'none';
+                    this.mainImage.style.display = 'none';
                 }
             }
             
@@ -1249,16 +1408,29 @@
                 });
             }
             
-            updateMediaInfo(segment) {
-                const mediaInfo = document.getElementById('mediaInfo');
+            updateLowerThird(segment) {
+                const lowerThird = document.getElementById('lowerThird');
+                const currentTime = this.newsAudio.currentTime;
                 
-                if (segment) {
-                    document.getElementById('mediaTitle').textContent = segment.display_name;
-                    document.getElementById('mediaDescription').textContent = segment.script;
-                    document.getElementById('mediaTime').textContent = `${this.formatTime(segment.start_time)} - ${this.formatTime(segment.end_time)}`;
-                    mediaInfo.style.display = 'block';
+                if (segment && segment.headline) {
+                    // Show lower-third for headline segments
+                    if (lowerThird.style.display !== 'block') {
+                        this.log('info', `📰 SHOWING LOWER-THIRD at ${this.formatTime(currentTime)} for "${segment.display_name}"`);
+                        this.log('info', `📰 Headline: "${segment.headline.text}"`);
+                        this.log('info', `📰 Category: "${segment.headline.category}" | Location: "${segment.headline.location}"`);
+                    }
+                    
+                    document.getElementById('newsCategory').textContent = segment.headline.category;
+                    document.getElementById('newsTimestamp').textContent = segment.headline.timestamp;
+                    document.getElementById('newsHeadline').textContent = segment.headline.text;
+                    document.getElementById('newsLocation').textContent = segment.headline.location;
+                    lowerThird.style.display = 'block';
                 } else {
-                    mediaInfo.style.display = 'none';
+                    // Hide lower-third for non-headline segments
+                    if (lowerThird.style.display !== 'none') {
+                        this.log('info', `📰 HIDING LOWER-THIRD at ${this.formatTime(currentTime)} - non-headline segment`);
+                    }
+                    lowerThird.style.display = 'none';
                 }
             }
             
@@ -1282,17 +1454,31 @@
             }
             
             seekToTime(time) {
-                this.log('info', `Seeking to ${this.formatTime(time)}`);
-                
+                const oldTime = this.newsAudio.currentTime;
                 const newTime = Math.max(0, Math.min(time, this.totalDuration));
+                
+                this.log('info', `⏭️ SEEKING: ${this.formatTime(oldTime)} → ${this.formatTime(newTime)} (requested: ${this.formatTime(time)})`);
+                
                 this.newsAudio.currentTime = newTime;
                 
                 // Update background music if playing
                 if (this.backgroundAudio.src && this.isPlaying) {
                     this.backgroundAudio.currentTime = newTime;
+                    this.log('info', `🎵 Background music synced to ${this.formatTime(newTime)}`);
                 }
                 
-                this.log('info', `Seeked to ${this.formatTime(newTime)}`);
+                // Find which segment we're seeking to
+                const targetSegment = this.segments.find(segment => 
+                    newTime >= segment.start_time && newTime <= segment.end_time
+                );
+                
+                if (targetSegment) {
+                    this.log('info', `🎯 Seeking to segment: "${targetSegment.display_name}" (${this.formatTime(targetSegment.start_time)}-${this.formatTime(targetSegment.end_time)})`);
+                } else {
+                    this.log('warning', `⚠️ Seeking to time outside any segment: ${this.formatTime(newTime)}`);
+                }
+                
+                this.log('info', `✅ Seek completed to ${this.formatTime(newTime)}`);
             }
             
             seekToSegment(index) {
@@ -1399,8 +1585,6 @@
                 }
             }
             
-
-            
             duckBackgroundMusic() {
                 // Smoothly reduce background music to 20% when main news audio plays
                 if (this.backgroundAudio.src) {
@@ -1425,6 +1609,51 @@
                 } else {
                     this.log('info', 'No background music to restore');
                 }
+            }
+            
+            dumpTimingState() {
+                const currentTime = this.newsAudio.currentTime;
+                
+                this.log('info', '🔍 =================================');
+                this.log('info', '🔍 TIMING STATE DUMP');
+                this.log('info', '🔍 =================================');
+                this.log('info', `🕐 Current Time: ${this.formatTime(currentTime)}`);
+                this.log('info', `📺 Total Duration: ${this.formatTime(this.totalDuration)}`);
+                this.log('info', `▶️ Is Playing: ${this.isPlaying}`);
+                
+                if (this.activeSegment) {
+                    const segment = this.activeSegment;
+                    const expectedStart = segment.start_time;
+                    const expectedEnd = segment.end_time;
+                    const timeIntoSegment = currentTime - expectedStart;
+                    const timeRemaining = expectedEnd - currentTime;
+                    
+                    this.log('info', `🎬 Active Segment: "${segment.display_name}"`);
+                    this.log('info', `📊 Expected: ${this.formatTime(expectedStart)}-${this.formatTime(expectedEnd)} (${segment.duration.toFixed(3)}s)`);
+                    this.log('info', `⏱️ Progress: ${this.formatTime(timeIntoSegment)} into segment`);
+                    this.log('info', `⏳ Remaining: ${this.formatTime(timeRemaining)} left in segment`);
+                    this.log('info', `🖼️ Media: ${segment.media ? segment.media.length : 0} items`);
+                    
+                    if (segment.media && segment.media.length > 1) {
+                        this.log('info', `🔄 Image rotation: ${this.imageRotationInterval ? 'Active' : 'Inactive'}`);
+                        if (this.imageRotationInterval) {
+                            this.log('info', `📸 Current image index: ${this.currentImageIndex + 1}/${segment.media.length}`);
+                        }
+                    }
+                } else {
+                    this.log('info', '🎬 Active Segment: None');
+                }
+                
+                // Show next segment
+                const nextSegment = this.segments.find(segment => 
+                    currentTime < segment.start_time
+                );
+                if (nextSegment) {
+                    const timeToNext = nextSegment.start_time - currentTime;
+                    this.log('info', `⏭️ Next Segment: "${nextSegment.display_name}" in ${this.formatTime(timeToNext)}`);
+                }
+                
+                this.log('info', '🔍 =================================');
             }
             
             formatTime(seconds) {

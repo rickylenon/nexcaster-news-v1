@@ -88,6 +88,15 @@ def map_media_to_segments(manifest, news_data):
                 if headline_index >= 0 and headline_index < len(news_data):
                     news_item = news_data[headline_index]
                     
+                    # Add headline data for lower-third display
+                    segment['headline'] = {
+                        "text": segment.get('script', ''),
+                        "location": "Pulilan, Bulacan",
+                        "category": "Breaking News" if headline_number == 1 else "Local News",
+                        "priority": "high" if headline_number == 1 else "normal",
+                        "timestamp": "LIVE"
+                    }
+                    
                     # Add first media from corresponding news item for headline
                     if news_item.get('media') and len(news_item['media']) > 0:
                         first_image = news_item['media'][0]
@@ -99,7 +108,7 @@ def map_media_to_segments(manifest, news_data):
                             "original_name": first_image.get('original_name', ''),
                             "size_mb": first_image.get('size_mb', 0)
                         })
-                        print(f"  ✅ Added headline {headline_number} image: {first_image['image'][:30]}...")
+                        print(f"  ✅ Added headline {headline_number} with lower-third data and image: {first_image['image'][:30]}...")
                     else:
                         print(f"  ⚠️  No media found for headline {headline_number}")
                 else:

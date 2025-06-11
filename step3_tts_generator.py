@@ -486,13 +486,23 @@ def main():
             
             if os.path.exists(audio_path):
                 print(f"  ✅ Found: {audio_filename}")
+                
+                # Measure actual duration of existing audio file
+                try:
+                    audio_segment = AudioSegment.from_file(audio_path)
+                    actual_duration = len(audio_segment) / 1000.0  # Convert to seconds
+                    print(f"    📏 Measured duration: {actual_duration:.3f}s (estimated was: {segment.get('duration', 0)}s)")
+                except Exception as e:
+                    print(f"    ⚠️  Warning: Could not measure audio duration: {e}")
+                    actual_duration = segment.get("duration", 0)  # Fallback to estimated
+                
                 audio_results.append({
                     "segment_type": segment["segment_type"],
                     "display_name": segment["display_name"],
                     "audio_file": audio_filename,
                     "audio_path": audio_path,
                     "script": segment["script"],
-                    "duration": segment.get("duration", 0),
+                    "duration": round(actual_duration, 3),
                     "language": LANGUAGE,
                     "voice_used": TTS_CONFIG.get("voice_id", "ElevenLabs"),
                     "tts_service": "ElevenLabs"
@@ -512,8 +522,8 @@ def main():
     cumulative_time = 0
     updated_audio_results = []
     
-    print("\n=== Calculating Segment Timing ===")
-    for result in audio_results:
+    print("\n=== Calculating Segment Timing (with 1s pauses) ===")
+    for i, result in enumerate(audio_results):
         start_time = cumulative_time
         end_time = start_time + result['duration']
         
@@ -526,8 +536,16 @@ def main():
         
         updated_audio_results.append(updated_result)
         cumulative_time = end_time
+        
+        # Add 1-second pause after each segment (except the last one)
+        if i < len(audio_results) - 1:
+            cumulative_time += 1.0  # Add 1-second pause
+            print(f"    + 1.0s pause → next starts at {cumulative_time:.3f}s")
     
-    print(f"Total manifest duration: {cumulative_time:.3f}s ({cumulative_time/60:.2f} minutes)")
+    print(f"Total manifest duration with pauses: {cumulative_time:.3f}s ({cumulative_time/60:.2f} minutes)")
+    if combined_result:
+        print(f"Combined audio duration: {combined_result['total_duration']:.3f}s")
+        print(f"Timing match: {abs(cumulative_time - combined_result['total_duration']):.3f}s difference")
     
     # Update metadata to include combined file info and timing
     final_metadata = {
