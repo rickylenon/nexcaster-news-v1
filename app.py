@@ -423,15 +423,14 @@ def get_news_manifest():
             segments = manifest.get('individual_segments', [])
             segment_types = {}
             for segment in segments:
-                segment_name = segment.get('segment_name', 'unknown')
-                if segment_name.startswith('summary'):
-                    if segment_name == 'summary_opening':
-                        segment_types['summary_opening'] = segment_types.get('summary_opening', 0) + 1
-                    else:
-                        segment_types['summary_headlines'] = segment_types.get('summary_headlines', 0) + 1
-                elif segment_name.startswith('news'):
+                segment_type = segment.get('segment_type', 'unknown')
+                if segment_type == 'headline_opening':
+                    segment_types['headline_opening'] = segment_types.get('headline_opening', 0) + 1
+                elif segment_type == 'headline':
+                    segment_types['headlines'] = segment_types.get('headlines', 0) + 1
+                elif segment_type == 'news':
                     segment_types['news_stories'] = segment_types.get('news_stories', 0) + 1
-                elif segment_name in ['opening_greeting', 'closing_remarks']:
+                elif segment_type in ['opening_greeting', 'closing_remarks']:
                     segment_types['greetings'] = segment_types.get('greetings', 0) + 1
                 else:
                     segment_types['other'] = segment_types.get('other', 0) + 1

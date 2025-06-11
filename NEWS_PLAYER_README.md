@@ -85,7 +85,7 @@ The player expects a news manifest at `generated/news_manifest.json`:
 {
   "individual_segments": [
     {
-      "segment_name": "opening_greeting",
+      "segment_type": "opening_greeting",
       "display_name": "Opening Greeting",
       "audio_file": "opening_greeting.mp3",
       "audio_path": "generated/audio/opening_greeting.mp3",

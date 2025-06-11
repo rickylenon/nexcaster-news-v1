@@ -41,13 +41,13 @@ def map_media_to_segments(manifest, news_data):
     updated_segments = []
     
     for segment in manifest['individual_segments']:
-        segment_name = segment['segment_name']
-        print(f"\nProcessing segment: {segment_name}")
+        segment_type = segment['segment_type']
+        print(f"\nProcessing segment: {segment_type}")
         
         # Add media array to segment
         segment['media'] = []
         
-        if segment_name == 'opening_greeting':
+        if segment_type == 'opening_greeting':
             # Add intro.mp4 for opening
             segment['media'].append({
                 "video": "intro.mp4",
@@ -56,7 +56,7 @@ def map_media_to_segments(manifest, news_data):
             })
             print(f"  ✅ Added intro.mp4")
             
-        elif segment_name == 'closing_remarks':
+        elif segment_type == 'closing_remarks':
             # Add outro.mp4 for closing
             segment['media'].append({
                 "video": "outro.mp4", 
@@ -65,41 +65,65 @@ def map_media_to_segments(manifest, news_data):
             })
             print(f"  ✅ Added outro.mp4")
             
-        elif segment_name == 'summary_opening':
-            # No media for summary opening - it's just the introduction
-            print(f"  📢 Summary opening - no media needed")
+        elif segment_type == 'headline_opening':
+            # No media for headline opening - it's just the introduction
+            print(f"  📢 Headline opening - no media needed")
             
-        elif segment_name.startswith('summary'):
-            # Extract summary number (summary1 -> 1, summary2 -> 2, etc.)
-            try:
-                summary_index = int(segment_name.replace('summary', '')) - 1  # Convert to 0-based index
-                if summary_index < len(news_data):
-                    news_item = news_data[summary_index]
+        elif segment_type == 'headline':
+            # For headlines, extract the number from display_name (e.g., "News Headline 1" -> 1)
+            display_name = segment.get('display_name', '')
+            headline_number = None
+            
+            # Extract number from display name like "News Headline 1", "News Headline 2", etc.
+            if 'Headline' in display_name:
+                try:
+                    # Split by space and get the last part, which should be the number
+                    parts = display_name.split()
+                    headline_number = int(parts[-1])
+                except (ValueError, IndexError):
+                    print(f"  ⚠️  Could not extract headline number from: {display_name}")
+            
+            if headline_number is not None:
+                headline_index = headline_number - 1  # Convert to 0-based index
+                if headline_index >= 0 and headline_index < len(news_data):
+                    news_item = news_data[headline_index]
                     
-                    # Add first media from corresponding news item for summary
+                    # Add first media from corresponding news item for headline
                     if news_item.get('media') and len(news_item['media']) > 0:
                         first_image = news_item['media'][0]
                         segment['media'].append({
                             "image": first_image['image'],
                             "path": f"media/{first_image['image']}",
-                            "type": "summary_image",
-                            "news_index": summary_index + 1,
+                            "type": "headline_image",
+                            "news_index": headline_index + 1,
                             "original_name": first_image.get('original_name', ''),
                             "size_mb": first_image.get('size_mb', 0)
                         })
-                        print(f"  ✅ Added summary image: {first_image['image'][:30]}...")
+                        print(f"  ✅ Added headline {headline_number} image: {first_image['image'][:30]}...")
                     else:
-                        print(f"  ⚠️  No media found for summary {summary_index + 1}")
+                        print(f"  ⚠️  No media found for headline {headline_number}")
                 else:
-                    print(f"  ⚠️  Summary index {summary_index + 1} not found in news data")
-            except ValueError:
-                print(f"  ❌ Could not extract summary index from {segment_name}")
+                    print(f"  ⚠️  Headline {headline_number} not found in news data (only {len(news_data)} items)")
+            else:
+                print(f"  ⚠️  Could not determine headline number for: {display_name}")
             
-        elif segment_name.startswith('news'):
-            # Extract news number (news1 -> 1, news2 -> 2, etc.)
-            try:
-                news_index = int(segment_name.replace('news', '')) - 1  # Convert to 0-based index
-                if news_index < len(news_data):
+        elif segment_type == 'news':
+            # For news stories, extract the number from display_name (e.g., "News Story 1" -> 1)
+            display_name = segment.get('display_name', '')
+            news_number = None
+            
+            # Extract number from display name like "News Story 1", "News Story 2", etc.
+            if 'Story' in display_name:
+                try:
+                    # Split by space and get the last part, which should be the number
+                    parts = display_name.split()
+                    news_number = int(parts[-1])
+                except (ValueError, IndexError):
+                    print(f"  ⚠️  Could not extract news story number from: {display_name}")
+            
+            if news_number is not None:
+                news_index = news_number - 1  # Convert to 0-based index
+                if news_index >= 0 and news_index < len(news_data):
                     news_item = news_data[news_index]
                     
                     # Add all media from corresponding news item
@@ -112,13 +136,13 @@ def map_media_to_segments(manifest, news_data):
                                 "original_name": media_item.get('original_name', ''),
                                 "size_mb": media_item.get('size_mb', 0)
                             })
-                        print(f"  ✅ Added {len(news_item['media'])} media items")
+                        print(f"  ✅ Added {len(news_item['media'])} media items for news story {news_number}")
                     else:
-                        print(f"  ⚠️  No media found for this news story")
+                        print(f"  ⚠️  No media found for news story {news_number}")
                 else:
-                    print(f"  ⚠️  News index {news_index + 1} not found in news data")
-            except ValueError:
-                print(f"  ❌ Could not extract news index from {segment_name}")
+                    print(f"  ⚠️  News story {news_number} not found in news data (only {len(news_data)} items)")
+            else:
+                print(f"  ⚠️  Could not determine news story number for: {display_name}")
         
         updated_segments.append(segment)
     

@@ -142,7 +142,7 @@ Edit `config.py` to customize:
 {
   "individual_segments": [
     {
-      "segment_name": "opening_greeting",
+      "segment_type": "opening_greeting",
       "display_name": "Opening Greeting",
       "audio_file": "opening_greeting.mp3",
       "audio_path": "generated/audio/opening_greeting.mp3",
@@ -166,7 +166,7 @@ Edit `config.py` to customize:
 {
   "individual_segments": [
     {
-      "segment_name": "opening_greeting",
+      "segment_type": "opening_greeting",
       "display_name": "Opening Greeting",
       "audio_file": "opening_greeting.mp3",
       "duration": 16.248,
@@ -187,7 +187,7 @@ Edit `config.py` to customize:
 ```json
 [
   {
-    "segment_name": "opening_greeting",
+    "segment_type": "opening_greeting",
     "display_name": "Opening Greeting",
     "display_order": 0,
     "duration": 15.0,

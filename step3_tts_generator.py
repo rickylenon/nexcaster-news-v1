@@ -24,6 +24,11 @@ from config import TTS_USE, TTS_CONFIG_OPENAI, TTS_CONFIG_GOOGLE, TTS_CONFIG_ELE
 load_dotenv()
 print(f"Loaded environment variables from .env file")
 
+# Fix PATH to include ffmpeg location
+if "/opt/homebrew/bin" not in os.environ.get("PATH", ""):
+    os.environ["PATH"] = f"/opt/homebrew/bin:/usr/local/bin:{os.environ.get('PATH', '')}"
+    print(f"Added Homebrew paths to PATH for ffmpeg access")
+
 # Select TTS configuration based on TTS_USE setting
 if TTS_USE.upper() == "GOOGLE":
     TTS_CONFIG = TTS_CONFIG_GOOGLE
@@ -46,6 +51,7 @@ elif TTS_USE.upper() == "ELEVENLABS":
         print("Please install it using: pip install elevenlabs")
         exit(1)
     
+    print(f"Using ElevenLabs API key: {os.environ.get('ELEVEN_API_KEY')}")
     # Check for ElevenLabs API key
     if not os.environ.get("ELEVEN_API_KEY"):
         print("Warning: ELEVEN_API_KEY environment variable not set!")
@@ -120,8 +126,9 @@ def generate_audio_with_google_tts(segment, output_dir):
     # Create audio output directory
     os.makedirs(output_dir, exist_ok=True)
     
-    # Output filename
-    audio_filename = f"{segment['segment_name']}.{TTS_CONFIG['output_format']}"
+    # Output filename - use unique identifier to avoid overwriting
+    segment_id = f"{segment['segment_type']}_{segment.get('display_order', 0)}"
+    audio_filename = f"{segment_id}.{TTS_CONFIG['output_format']}"
     audio_path = os.path.join(output_dir, audio_filename)
     
     try:
@@ -172,7 +179,7 @@ def generate_audio_with_google_tts(segment, output_dir):
             actual_duration = segment["duration"]  # Fallback to estimated
         
         return {
-            "segment_name": segment["segment_name"],
+            "segment_type": segment["segment_type"],
             "display_name": segment["display_name"],
             "audio_file": audio_filename,
             "audio_path": audio_path,
@@ -184,7 +191,7 @@ def generate_audio_with_google_tts(segment, output_dir):
         }
         
     except Exception as e:
-        print(f"Error generating audio with Google TTS for {segment['segment_name']}: {e}")
+        print(f"Error generating audio with Google TTS for {segment['segment_type']}: {e}")
         return None
 
 def generate_audio_with_openai_tts(segment, output_dir):
@@ -196,8 +203,9 @@ def generate_audio_with_openai_tts(segment, output_dir):
     # Create audio output directory
     os.makedirs(output_dir, exist_ok=True)
     
-    # Output filename
-    audio_filename = f"{segment['segment_name']}.{TTS_CONFIG['output_format']}"
+    # Output filename - use unique identifier to avoid overwriting
+    segment_id = f"{segment['segment_type']}_{segment.get('display_order', 0)}"
+    audio_filename = f"{segment_id}.{TTS_CONFIG['output_format']}"
     audio_path = os.path.join(output_dir, audio_filename)
     
     try:
@@ -237,7 +245,7 @@ def generate_audio_with_openai_tts(segment, output_dir):
             actual_duration = segment["duration"]  # Fallback to estimated
         
         return {
-            "segment_name": segment["segment_name"],
+            "segment_type": segment["segment_type"],
             "display_name": segment["display_name"],
             "audio_file": audio_filename,
             "audio_path": audio_path,
@@ -249,7 +257,7 @@ def generate_audio_with_openai_tts(segment, output_dir):
         }
         
     except Exception as e:
-        print(f"Error generating audio with OpenAI TTS for {segment['segment_name']}: {e}")
+        print(f"Error generating audio with OpenAI TTS for {segment['segment_type']}: {e}")
         return None
 
 def generate_audio_with_elevenlabs_tts(segment, output_dir):
@@ -261,8 +269,9 @@ def generate_audio_with_elevenlabs_tts(segment, output_dir):
     # Create audio output directory
     os.makedirs(output_dir, exist_ok=True)
     
-    # Output filename (ElevenLabs returns mp3)
-    audio_filename = f"{segment['segment_name']}.mp3"
+    # Output filename (ElevenLabs returns mp3) - use unique identifier to avoid overwriting
+    segment_id = f"{segment['segment_type']}_{segment.get('display_order', 0)}"
+    audio_filename = f"{segment_id}.mp3"
     audio_path = os.path.join(output_dir, audio_filename)
     
     try:
@@ -316,7 +325,7 @@ def generate_audio_with_elevenlabs_tts(segment, output_dir):
             actual_duration = segment["duration"]  # Fallback to estimated
         
         return {
-            "segment_name": segment["segment_name"],
+            "segment_type": segment["segment_type"],
             "display_name": segment["display_name"],
             "audio_file": audio_filename,
             "audio_path": audio_path,
@@ -328,7 +337,7 @@ def generate_audio_with_elevenlabs_tts(segment, output_dir):
         }
         
     except Exception as e:
-        print(f"Error generating audio with ElevenLabs TTS for {segment['segment_name']}: {e}")
+        print(f"Error generating audio with ElevenLabs TTS for {segment['segment_type']}: {e}")
         return None
 
 def generate_audio_from_script(segment, output_dir):
@@ -354,25 +363,25 @@ def combine_audio_segments(audio_results, output_dir):
         print("Error: Could not load scripts to determine display order!")
         return None
     
-    # Create a mapping of segment_name to display_order
+    # Create a mapping of segment_type to display_order
     display_order_map = {}
     for script in scripts:
-        display_order_map[script['segment_name']] = script.get('display_order', 999)
+        display_order_map[script['segment_type']] = script.get('display_order', 999)
     
-    # Sort audio results by their actual display_order from scripts
+    # Sort audio results by display_order using the mapping
     segment_order = []
     for result in audio_results:
-        segment_name = result['segment_name']
-        display_order = display_order_map.get(segment_name, 999)
+        segment_type = result['segment_type']
+        display_order = display_order_map.get(segment_type, 999)
         segment_order.append((display_order, result))
-        print(f"  Found segment: {segment_name} with display_order: {display_order}")
+        print(f"  Found segment: {segment_type} with display_order: {display_order}")
     
     # Sort by display_order
     segment_order.sort(key=lambda x: x[0])
     
     print(f"Segments will be combined in this order:")
     for order, result in segment_order:
-        print(f"  {order}: {result['display_name']} ({result['segment_name']})")
+        print(f"  {order}: {result['display_name']} ({result['segment_type']})")
     
     try:
         combined_audio = AudioSegment.empty()
@@ -427,8 +436,16 @@ def combine_audio_segments(audio_results, output_dir):
 
 def main():
     """Main function to generate TTS audio"""
+    import sys
+    
+    # Check for combine-only flag
+    combine_only = "--combine-only" in sys.argv or "-c" in sys.argv
+    
     print("=== Nexcaster News TTS Generator ===")
-    print("Step 3: Generating audio from news scripts")
+    if combine_only:
+        print("Step 3: Combining existing audio files (SKIP GENERATION)")
+    else:
+        print("Step 3: Generating audio from news scripts")
     print(f"TTS Service: {TTS_USE}")
     print(f"Language: {LANGUAGE}")
     
@@ -457,12 +474,36 @@ def main():
     # Create audio output directory
     audio_dir = os.path.join('generated', 'audio')
     
-    # Generate audio for each segment
+    # Generate audio for each segment (or skip if combine-only)
     audio_results = []
-    for segment in scripts:
-        result = generate_audio_from_script(segment, audio_dir)
-        if result:
-            audio_results.append(result)
+    if combine_only:
+        print("🔄 Skipping generation - looking for existing audio files...")
+        # Create audio_results from existing files
+        for segment in scripts:
+            segment_id = f"{segment['segment_type']}_{segment.get('display_order', 0)}"
+            audio_filename = f"{segment_id}.mp3"
+            audio_path = os.path.join(audio_dir, audio_filename)
+            
+            if os.path.exists(audio_path):
+                print(f"  ✅ Found: {audio_filename}")
+                audio_results.append({
+                    "segment_type": segment["segment_type"],
+                    "display_name": segment["display_name"],
+                    "audio_file": audio_filename,
+                    "audio_path": audio_path,
+                    "script": segment["script"],
+                    "duration": segment.get("duration", 0),
+                    "language": LANGUAGE,
+                    "voice_used": TTS_CONFIG.get("voice_id", "ElevenLabs"),
+                    "tts_service": "ElevenLabs"
+                })
+            else:
+                print(f"  ❌ Missing: {audio_filename}")
+    else:
+        for segment in scripts:
+            result = generate_audio_from_script(segment, audio_dir)
+            if result:
+                audio_results.append(result)
     
     # Combine all audio segments into one file
     combined_result = combine_audio_segments(audio_results, audio_dir)

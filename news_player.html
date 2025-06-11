@@ -874,7 +874,7 @@
                         const endTime = startTime + segment.duration;
                         
                         this.segments.push({
-                            name: segment.segment_name,
+                            name: segment.segment_type,
                             display_name: segment.display_name,
                             script: segment.script,
                             start_time: startTime,
@@ -1409,7 +1409,13 @@
                 const images = segment.media.filter(m => m.image);
                 images.forEach(media => {
                     const img = new Image();
-                    img.src = media.path.startsWith('/') ? media.path : '/' + media.path;
+                    let imgPath = media.path;
+                    if (!imgPath.startsWith('/')) {
+                        // If path starts with 'media/', use it as-is with leading slash
+                        // Otherwise assume it's just a filename and prepend '/media/'
+                        imgPath = imgPath.startsWith('media/') ? '/' + imgPath : '/media/' + imgPath;
+                    }
+                    img.src = imgPath;
                     img.onload = () => this.log('info', `Preloaded image: ${media.image}`);
                 });
                 
@@ -1493,7 +1499,12 @@
                         const selectedImage = images[this.currentImageIndex];
                         
                         // Update image display
-                        const imagePath = selectedImage.path.startsWith('/') ? selectedImage.path : '/' + selectedImage.path;
+                        let imagePath = selectedImage.path;
+                        if (!imagePath.startsWith('/')) {
+                            // If path starts with 'media/', use it as-is with leading slash
+                            // Otherwise assume it's just a filename and prepend '/media/'
+                            imagePath = imagePath.startsWith('media/') ? '/' + imagePath : '/media/' + imagePath;
+                        }
                         this.mainImage.src = imagePath;
                         this.log('info', `Rotated to image ${this.currentImageIndex + 1}/${images.length}: ${selectedImage.image}`);
                     }, rotationInterval);
@@ -1519,6 +1530,8 @@
                     return;
                 }
                 
+                this.log('info', `Processing media for segment: ${segment.display_name} (${segment.media.length} items)`);
+                
                 // Prioritize videos first, then images
                 const videos = segment.media.filter(m => m.video);
                 const images = segment.media.filter(m => m.image);
@@ -1529,7 +1542,12 @@
                     this.mainImage.style.display = 'none';
                     this.mainVideo.style.display = 'block';
                     // Ensure absolute path for video
-                    const videoPath = media.path.startsWith('/') ? media.path : '/' + media.path;
+                    let videoPath = media.path;
+                    if (!videoPath.startsWith('/')) {
+                        // If path starts with 'media/', use it as-is with leading slash
+                        // Otherwise assume it's just a filename and prepend '/media/'
+                        videoPath = videoPath.startsWith('media/') ? '/' + videoPath : '/media/' + videoPath;
+                    }
                     this.mainVideo.src = videoPath;
                     await this.mainVideo.play();
                     this.log('info', `Playing video: ${media.video}`);
@@ -1543,9 +1561,14 @@
                     this.mainVideo.style.display = 'none';
                     this.mainImage.style.display = 'block';
                     // Ensure absolute path for image
-                    const imagePath = selectedImage.path.startsWith('/') ? selectedImage.path : '/' + selectedImage.path;
+                    let imagePath = selectedImage.path;
+                    if (!imagePath.startsWith('/')) {
+                        // If path starts with 'media/', use it as-is with leading slash
+                        // Otherwise assume it's just a filename and prepend '/media/'
+                        imagePath = imagePath.startsWith('media/') ? '/' + imagePath : '/media/' + imagePath;
+                    }
                     this.mainImage.src = imagePath;
-                    this.log('info', `Displaying first image of ${images.length}: ${selectedImage.image}`);
+                    this.log('info', `Displaying image: ${selectedImage.image}`);
                 }
             }
             

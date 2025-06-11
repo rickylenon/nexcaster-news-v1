@@ -10,7 +10,11 @@ import openai
 from datetime import datetime
 import pytz
 import re
+from dotenv import load_dotenv
 from config import SEGMENT_TYPES, DEFAULT_SEGMENT_ORDER, STATION_INFO, LLM_CONFIG, LANGUAGE, FILIPINO_TEXT_PROCESSING, USE_REPLACEMENTS
+
+# Load environment variables from .env file
+load_dotenv()
 
 def clean_special_characters(text):
     """Replace special characters with standard equivalents"""
@@ -221,7 +225,7 @@ def generate_opening_script(time_info):
         print("Applied Filipino text processing to opening script")
     
     return {
-        "segment_name": "opening_greeting",
+        "segment_type": "opening_greeting",
         "display_name": SEGMENT_TYPES["opening"]["display_name"],
         "display_order": 0,
         "duration": SEGMENT_TYPES["opening"]["default_duration"],
@@ -229,14 +233,14 @@ def generate_opening_script(time_info):
     }
 
 def generate_summary_scripts(news_data, time_info):
-    """Generate individual news summary scripts using LLM for each news item"""
+    """Generate individual news headline scripts using LLM for each news item"""
     if not news_data:
         return []
     
     summary_scripts = []
     
-    # 1. Generate summary opening segment
-    print("Generating summary opening...")
+    # 1. Generate headline opening segment
+    print("Generating headline opening...")
     if LANGUAGE.lower() == "filipino":
         opening_script = "Narito ang mga pangunahing balita sa aming bayan."
     else:
@@ -245,20 +249,20 @@ def generate_summary_scripts(news_data, time_info):
     # Process the opening script for Filipino TTS if language is Filipino and USE_REPLACEMENTS is True
     if LANGUAGE.lower() == "filipino" and USE_REPLACEMENTS:
         opening_script = process_filipino_script(opening_script)
-        print("Applied Filipino text processing to summary opening")
+        print("Applied Filipino text processing to headline opening")
     
     summary_opening = {
-        "segment_name": "summary_opening",
-        "display_name": "News Summary Opening",
+        "segment_type": "headline_opening",
+        "display_name": "News Headline Opening",
         "display_order": 1,
         "duration": 5.0,  # Short opening
         "script": opening_script
     }
     summary_scripts.append(summary_opening)
     
-    # 2. Generate individual summary segments
+    # 2. Generate individual headline segments
     for i, news_item in enumerate(news_data):
-        print(f"Generating summary for news item {i+1}...")
+        print(f"Generating headline for news item {i+1}...")
         
         prompt = f"""Create a news HEADLINE TITLE for {STATION_INFO['station_name']} for this specific news item:
 
@@ -266,13 +270,13 @@ News Content: {news_item['news']}
 
 Requirements:
 - Language: Write the script in {LANGUAGE}
-- Duration: approximately {SEGMENT_TYPES['summary']['default_duration']} seconds per summary
+- Duration: approximately {SEGMENT_TYPES['headline']['default_duration']} seconds per headline
 - Create a proper NEWS HEADLINE TITLE like you'd see on TV news
 - Think of how CNN, BBC, or GMA News headlines work - short, clear, informative titles
 - DO NOT copy snippets from the actual content
 - DO NOT include phrases like "Pakiusap sa mga may-ari" or "Alamin kung paano"
 - Create a TITLE that summarizes what the story is about
-- Local Pulilan, Bulacan perspective when relevant
+- Local Pulilan perspective when relevant
 - Examples of good headline titles:
   * "Stray Dog Recovery Program Launched in Multiple Barangays"  
   * "Women's Agricultural Training Program Success in Peñabatan"
@@ -307,23 +311,23 @@ Script (anchor headline TITLE only in {LANGUAGE}, professional news title format
             )
             
             script = response.choices[0].message.content.strip()
-            print(f"Generated summary script for news item {i+1} using LLM")
+            print(f"Generated headline script for news item {i+1} using LLM")
             
         except Exception as e:
-            print(f"Error generating summary script for news item {i+1}: {e}")
+            print(f"Error generating headline script for news item {i+1}: {e}")
             # Fallback to simple template
             script = news_item['news'][:150] + ("..." if len(news_item['news']) > 150 else "")
         
         # Process the script for Filipino TTS if language is Filipino and USE_REPLACEMENTS is True
         if LANGUAGE.lower() == "filipino" and USE_REPLACEMENTS:
             script = process_filipino_script(script)
-            print(f"Applied Filipino text processing to summary script {i+1}")
+            print(f"Applied Filipino text processing to headline script {i+1}")
         
         summary_script = {
-            "segment_name": f"summary{i+1}",
-            "display_name": f"News Summary {i+1}",
-            "display_order": i + 2,  # After opening (0) and summary_opening (1)
-            "duration": SEGMENT_TYPES["summary"]["default_duration"],
+            "segment_type": "headline",
+            "display_name": f"News Headline {i+1}",
+            "display_order": i + 2,  # After opening (0) and headline_opening (1)
+            "duration": SEGMENT_TYPES["headline"]["default_duration"],
             "script": script
         }
         
@@ -332,11 +336,11 @@ Script (anchor headline TITLE only in {LANGUAGE}, professional news title format
     return summary_scripts
 
 def generate_news_scripts(news_data, time_info):
-    """Generate individual news story scripts using LLM"""
+    """Generate individual news story scripts and headlines using LLM"""
     news_scripts = []
     
     for i, news_item in enumerate(news_data):
-        print(f"Generating script for news item {i+1}...")
+        print(f"Generating headline and script for news item {i+1}...")
         
         # Prepare media context
         media_context = ""
@@ -353,7 +357,62 @@ def generate_news_scripts(news_data, time_info):
             if media_types:
                 media_context = f"\nAvailable media: {', '.join(set(media_types))}"
         
-        prompt = f"""Create a news story script for {STATION_INFO['station_name']} based on this news content:
+        # First, generate the headline
+        headline_prompt = f"""Create a news HEADLINE for {STATION_INFO['station_name']} for this specific news item:
+
+News Content: {news_item['news']}
+
+Requirements:
+- Language: Write the headline in {LANGUAGE}
+- Create a proper NEWS HEADLINE like you'd see on TV news
+- Think of how CNN, BBC, or GMA News headlines work - short, clear, informative titles
+- DO NOT copy snippets from the actual content
+- DO NOT include phrases like "Pakiusap sa mga may-ari" or "Alamin kung paano"
+- Create a TITLE that summarizes what the story is about
+- Local Pulilan, Bulacan perspective when relevant
+- Examples of good headline titles:
+  * "Stray Dog Recovery Program Launched in Multiple Barangays"  
+  * "Women's Agricultural Training Program Success in Peñabatan"
+  * "Rainy Season Preparation Tips Released by Weather Bureau"
+- Start directly with the headline title
+- Keep it professional and informative
+- IMPORTANT: Generate ONLY the headline text that would appear on screen
+- Do NOT use abbreviations (spell out LGU, DOH, PNP, etc.)
+- Do NOT use title abbreviations - spell them out: use "Miss" not "Ms.", "Doctor" not "Dr.", "Mister" not "Mr.", "Santo" not "Sto.", etc.
+- Do NOT use special characters or symbols
+- Use simple, clear punctuation only
+- Keep it brief and title-like - this is a HEADLINE, not content
+
+Headline (in {LANGUAGE}, professional news headline format, no abbreviations, spell out all titles):"""
+
+        headline = ""
+        try:
+            client = openai.OpenAI()
+            response = client.chat.completions.create(
+                model=LLM_CONFIG["model"],
+                messages=[
+                    {"role": "system", "content": LLM_CONFIG["system_prompt"]},
+                    {"role": "user", "content": headline_prompt}
+                ],
+                temperature=LLM_CONFIG["temperature"],
+                max_tokens=LLM_CONFIG["max_tokens"]
+            )
+            
+            headline = response.choices[0].message.content.strip()
+            print(f"Generated headline for news item {i+1} using LLM")
+            
+        except Exception as e:
+            print(f"Error generating headline for news item {i+1}: {e}")
+            # Fallback to simple template
+            headline = news_item['news'][:100] + ("..." if len(news_item['news']) > 100 else "")
+        
+        # Process the headline for Filipino TTS if language is Filipino and USE_REPLACEMENTS is True
+        if LANGUAGE.lower() == "filipino" and USE_REPLACEMENTS:
+            headline = process_filipino_script(headline)
+            print(f"Applied Filipino text processing to headline {i+1}")
+        
+        # Now generate the script
+        script_prompt = f"""Create a news story script for {STATION_INFO['station_name']} based on this news content:
 
 News Context: {news_item['news']}{media_context}
 
@@ -382,13 +441,14 @@ Requirements:
 
 Script (anchor speech only in {LANGUAGE}, no greeting, smooth transition, no abbreviations, spell out all titles):"""
 
+        script = ""
         try:
             client = openai.OpenAI()
             response = client.chat.completions.create(
                 model=LLM_CONFIG["model"],
                 messages=[
                     {"role": "system", "content": LLM_CONFIG["system_prompt"]},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": script_prompt}
                 ],
                 temperature=LLM_CONFIG["temperature"],
                 max_tokens=LLM_CONFIG["max_tokens"]
@@ -411,10 +471,11 @@ Script (anchor speech only in {LANGUAGE}, no greeting, smooth transition, no abb
             print(f"Applied Filipino text processing to news script {i+1}")
         
         news_script = {
-            "segment_name": f"news{i+1}",
+            "segment_type": "news",
             "display_name": f"News Story {i+1}",
-            "display_order": i + 100,  # After opening, summary_opening, and summaries, using 100+ to ensure they come after all summaries
+            "display_order": i + 100,  # After opening, headline_opening, and headlines, using 100+ to ensure they come after all headlines
             "duration": SEGMENT_TYPES["news"]["default_duration"],
+            "headline": headline,
             "script": script
         }
         
@@ -435,7 +496,7 @@ def generate_closing_script(time_info):
         print("Applied Filipino text processing to closing script")
     
     return {
-        "segment_name": "closing_remarks",
+        "segment_type": "closing_remarks",
         "display_name": SEGMENT_TYPES["closing"]["display_name"],
         "display_order": 999,  # Last segment
         "duration": SEGMENT_TYPES["closing"]["default_duration"],
@@ -503,7 +564,7 @@ def main():
     total_duration = sum(script['duration'] for script in scripts)
     print(f"Estimated total duration: {total_duration:.1f} seconds ({total_duration/60:.1f} minutes)")
     
-    # Display summary
+    # Display headline
     print("\nGenerated segments:")
     for script in scripts:
         print(f"  - {script['display_name']}: {script['duration']}s")
