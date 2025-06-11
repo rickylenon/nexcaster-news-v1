@@ -326,102 +326,7 @@
             margin-top: 20px;
         }
 
-        .sync-controls {
-            background: rgba(255,255,255,0.05);
-            border-radius: 10px;
-            padding: 15px;
-            margin-top: 15px;
-        }
 
-        .sync-controls h4 {
-            color: #3498db;
-            margin-bottom: 10px;
-            font-size: 0.9em;
-        }
-
-        .sync-status {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
-            font-size: 0.8em;
-        }
-
-        .sync-indicator {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #4CAF50;
-        }
-
-        .sync-indicator.warning {
-            background: #ff9800;
-        }
-
-        .sync-indicator.error {
-            background: #f44336;
-        }
-
-        .sync-controls-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
-        .sync-control {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.8em;
-        }
-
-        .sync-control label {
-            min-width: 80px;
-            color: #ccc;
-        }
-
-        .sync-control input[type="range"] {
-            flex: 1;
-            height: 3px;
-        }
-
-        .sync-control .value {
-            min-width: 50px;
-            text-align: right;
-            font-family: monospace;
-        }
-
-        .sync-buttons {
-            display: flex;
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        .sync-btn {
-            background: rgba(255,255,255,0.1);
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            color: white;
-            cursor: pointer;
-            font-size: 0.8em;
-            transition: background 0.3s ease;
-        }
-
-        .sync-btn:hover {
-            background: rgba(255,255,255,0.2);
-        }
-
-        .sync-btn.active {
-            background: #3498db;
-        }
-
-        .keyboard-shortcuts {
-            font-size: 0.75em;
-            color: #888;
-            margin-top: 8px;
-            line-height: 1.3;
-        }
 
         .volume-group {
             display: flex;
@@ -654,49 +559,7 @@
                 </div>
             </div>
 
-            <div class="sync-controls">
-                <h4>🎯 Audio-Visual Sync Controls</h4>
-                <div class="sync-status">
-                    <div id="syncStatusIndicator" class="sync-indicator"></div>
-                    <span>Sync Status: <span id="syncStatusText">Initializing...</span></span>
-                    <span>|</span>
-                    <span>Drift: <span id="syncDriftText">0ms</span></span>
-                </div>
-                
-                <div class="sync-controls-grid">
-                    <div class="sync-control">
-                        <label>Sync Offset:</label>
-                        <input type="range" id="syncOffset" min="-1000" max="1000" value="300" step="50" title="Delay visuals relative to audio">
-                        <span id="syncOffsetValue" class="value">300ms</span>
-                    </div>
-                    <div class="sync-control">
-                        <label>Tolerance:</label>
-                        <input type="range" id="syncTolerance" min="50" max="500" value="100" step="25" title="Acceptable sync drift before correction">
-                        <span id="syncToleranceValue" class="value">100ms</span>
-                    </div>
-                    <div class="sync-control">
-                        <label>Preload:</label>
-                        <input type="range" id="preloadTime" min="0" max="2000" value="500" step="100" title="How early to prepare media">
-                        <span id="preloadTimeValue" class="value">500ms</span>
-                    </div>
-                    <div class="sync-control">
-                        <label>Transition:</label>
-                        <input type="range" id="transitionDelay" min="0" max="1000" value="200" step="50" title="Delay between media switches">
-                        <span id="transitionDelayValue" class="value">200ms</span>
-                    </div>
-                </div>
-                
-                <div class="sync-buttons">
-                    <button id="syncCalibrate" class="sync-btn">🎯 Auto Calibrate</button>
-                    <button id="syncReset" class="sync-btn">🔄 Reset</button>
-                    <button id="audioFirstMode" class="sync-btn active">🎵 Audio First</button>
-                    <button id="manualSyncMode" class="sync-btn active">⚙️ Manual</button>
-                </div>
-                
-                <div class="keyboard-shortcuts">
-                    <strong>Keyboard:</strong> [ ] = Sync offset ±50ms | ; ' = Fine tune ±10ms | P = Audio-first toggle
-                </div>
-            </div>
+
         </div>
 
         <div id="debugPanel" class="debug-panel" style="display: none;">
@@ -725,26 +588,6 @@
                 this.activeSegment = null;
                 this.debugMode = false;
                 this.isLoading = false;
-                
-                // Enhanced sync properties
-                this.syncOffset = 300; // ms - delay visuals relative to audio
-                this.syncTolerance = 100; // ms - acceptable drift before correction
-                this.preloadTime = 500; // ms - how early to prepare media
-                this.transitionDelay = 200; // ms - delay between media switches
-                this.audioFirstMode = false; // prioritize audio timing
-                this.lastSyncCheck = 0;
-                this.syncDrift = 0;
-                this.pendingSegmentChanges = new Map();
-                this.preloadedMedia = new Map();
-                
-                // Timing tracking
-                this.playbackStartTime = null;
-                this.pausedDuration = 0;
-                this.pausedTime = 0;
-                this.pauseStartTime = null;
-                this.preciseCurrentTime = 0;
-                this.lastAudioTime = 0;
-                this.audioTimeUpdateCount = 0;
                 
                 // Media rotation
                 this.imageRotationInterval = null;
@@ -802,7 +645,6 @@
                     await this.loadManifest();
                     this.setupAudioElements();
                     this.populatePlaylist();
-                    this.initializeSyncControls();
                     this.updateStatus('ready');
                     this.log('info', 'Player initialized successfully!');
                 } catch (error) {
@@ -830,22 +672,8 @@
                 this.videoVolume.addEventListener('input', (e) => this.updateVolume('video', e.target.value));
                 this.masterVolume.addEventListener('input', (e) => this.updateVolume('master', e.target.value));
                 
-                // Sync controls
-                document.getElementById('syncOffset').addEventListener('input', (e) => this.updateSyncSetting('offset', e.target.value));
-                document.getElementById('syncTolerance').addEventListener('input', (e) => this.updateSyncSetting('tolerance', e.target.value));
-                document.getElementById('preloadTime').addEventListener('input', (e) => this.updateSyncSetting('preload', e.target.value));
-                document.getElementById('transitionDelay').addEventListener('input', (e) => this.updateSyncSetting('transition', e.target.value));
-                
-                document.getElementById('syncCalibrate').addEventListener('click', () => this.calibrateSync());
-                document.getElementById('syncReset').addEventListener('click', () => this.resetSync());
-                document.getElementById('audioFirstMode').addEventListener('click', () => this.toggleAudioFirst());
-                document.getElementById('manualSyncMode').addEventListener('click', () => this.setManualMode());
-                
-                // Keyboard shortcuts for sync
-                document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
-                
-                // Audio event listeners with enhanced tracking
-                this.newsAudio.addEventListener('timeupdate', () => this.updateTimeline());
+                // Audio event listeners
+                this.newsAudio.addEventListener('timeupdate', () => this.updatePlayback());
                 this.newsAudio.addEventListener('ended', () => this.handlePlaybackEnd());
                 this.newsAudio.addEventListener('loadstart', () => this.log('info', 'Audio loading started'));
                 this.newsAudio.addEventListener('canplaythrough', () => this.log('info', 'Audio ready for playback'));
@@ -865,13 +693,14 @@
                     const apiResponse = await response.json();
                     this.manifest = apiResponse.manifest || apiResponse; // Handle API wrapper
                     
-                    // Process segments from manifest with proper timing calculation
+                    // Process segments from manifest using pre-calculated timing
                     this.segments = [];
                     let cumulativeTime = 0;
                     
                     for (const segment of this.manifest.individual_segments) {
-                        const startTime = cumulativeTime;
-                        const endTime = startTime + segment.duration;
+                        // Use pre-calculated timing if available, otherwise calculate
+                        const startTime = segment.start_time !== undefined ? segment.start_time : cumulativeTime;
+                        const endTime = segment.end_time !== undefined ? segment.end_time : startTime + segment.duration;
                         
                         this.segments.push({
                             name: segment.segment_type,
@@ -1119,44 +948,17 @@
                     this.isPlaying = true;
                     this.isLoading = false;
                     
-                    // Handle resuming from pause
-                    if (this.pauseStartTime && this.pausedTime !== undefined) {
-                        this.pausedDuration += (performance.now() - this.pauseStartTime);
-                        this.currentTime = this.pausedTime;
-                        this.preciseCurrentTime = this.pausedTime;
-                        this.newsAudio.currentTime = this.currentTime;
-                        this.pauseStartTime = null;
-                        this.log('info', `Resuming playback from ${this.formatTime(this.currentTime)}`);
-                    } else {
-                        this.currentTime = 0;
-                        this.preciseCurrentTime = 0;
-                        this.playbackStartTime = performance.now();
-                        this.pausedDuration = 0;
-                        this.newsAudio.currentTime = 0;
-                        
-                        // Reset sync tracking
-                        this.syncDrift = 0;
-                        this.audioTimeUpdateCount = 0;
-                        this.lastAudioTime = 0;
-                        this.pendingSegmentChanges.clear();
-                        this.preloadedMedia.clear();
-                        
-                        this.log('info', 'Starting fresh playback with enhanced sync');
-                    }
-                    
                     await this.newsAudio.play();
                     
-                    // Handle background music based on current time
+                    // Handle background music
                     if (this.backgroundAudio.src) {
-                        this.backgroundAudio.currentTime = this.currentTime;
+                        this.backgroundAudio.currentTime = this.newsAudio.currentTime;
                         await this.backgroundAudio.play();
-                        this.log('info', `Background music started at ${this.formatTime(this.currentTime)}`);
+                        this.log('info', `Background music started at ${this.formatTime(this.newsAudio.currentTime)}`);
                         
                         // Duck background music when news audio starts
                         this.duckBackgroundMusic();
                     }
-                    
-                    this.startMediaSync();
                     
                     this.log('info', 'Playback started successfully');
                     
@@ -1177,12 +979,6 @@
                 this.playBtn.disabled = false;
                 this.pauseBtn.disabled = true;
                 
-                if (this.playbackStartTime) {
-                    const elapsedMs = performance.now() - this.playbackStartTime - this.pausedDuration;
-                    this.pausedTime = elapsedMs / 1000;
-                    this.pauseStartTime = performance.now();
-                }
-                
                 this.newsAudio.pause();
                 this.backgroundAudio.pause();
                 this.segmentAudio.pause();
@@ -1195,22 +991,10 @@
                 this.log('info', 'Stopping playback...');
                 
                 this.isPlaying = false;
-                this.currentTime = 0;
                 this.activeSegment = null;
                 
                 // Clear image rotation
                 this.clearImageRotation();
-                
-                // Reset timeline tracking
-                this.playbackStartTime = null;
-                this.pausedDuration = 0;
-                this.pausedTime = 0;
-                this.pauseStartTime = null;
-                this.preciseCurrentTime = 0;
-                
-                // Reset background fade state
-                this.backgroundFadeStarted = false;
-                this.backgroundFadeStartTime = null;
                 
                 // Restore background music to 100% when stopping
                 if (this.backgroundAudio.src) {
@@ -1218,13 +1002,6 @@
                     this.updateVolume('background', 100);
                     document.getElementById('backgroundVolumeValue').textContent = '100%';
                 }
-                
-                // Clear sync state
-                this.syncDrift = 0;
-                this.audioTimeUpdateCount = 0;
-                this.lastAudioTime = 0;
-                this.pendingSegmentChanges.clear();
-                this.preloadedMedia.clear();
                 
                 // Stop and reset all audio/video
                 this.newsAudio.pause();
@@ -1270,158 +1047,36 @@
                 }
             }
             
-            startMediaSync() {
+            updatePlayback() {
                 if (!this.isPlaying) return;
                 
-                const now = performance.now();
+                this.currentTime = this.newsAudio.currentTime;
                 
-                // Enhanced timing calculation
-                this.updatePreciseTiming();
-                
-                // Apply sync offset for visual timing
-                const visualTime = this.preciseCurrentTime - (this.syncOffset / 1000);
-                
-                // Find current segment for visuals (with offset)
-                const visualSegment = this.segments.find(segment => 
-                    visualTime >= segment.start_time && 
-                    visualTime <= segment.end_time
+                // Find current segment based on audio time
+                const currentSegment = this.segments.find(segment => 
+                    this.currentTime >= segment.start_time && 
+                    this.currentTime <= segment.end_time
                 );
                 
-                // Find upcoming segment for preloading
-                const upcomingSegment = this.segments.find(segment => 
-                    segment.start_time > visualTime && 
-                    segment.start_time <= visualTime + (this.preloadTime / 1000)
-                );
-                
-                // Preload upcoming media
-                if (upcomingSegment && !this.preloadedMedia.has(upcomingSegment.name)) {
-                    this.preloadSegmentMedia(upcomingSegment);
+                // Handle segment changes
+                if (currentSegment !== this.activeSegment) {
+                    if (this.activeSegment) {
+                        this.deactivateSegment(this.activeSegment);
+                    }
+                    if (currentSegment) {
+                        this.activateSegment(currentSegment);
+                    }
+                    this.activeSegment = currentSegment;
+                    this.log('info', `Segment changed to: ${currentSegment ? currentSegment.display_name : 'none'}`);
                 }
-                
-                // Check for sync drift and handle segment changes
-                this.checkSyncDrift();
-                this.handleSegmentTransition(visualSegment, now);
                 
                 // Update UI
+                this.updateTimeline();
                 this.updateActivePlaylistItems();
-                this.updateMediaInfo(visualSegment);
-                this.updateSyncStatus();
-                
-                // Schedule next sync frame
-                requestAnimationFrame(() => this.startMediaSync());
+                this.updateMediaInfo(currentSegment);
             }
             
-            updatePreciseTiming() {
-                const audioTime = this.newsAudio.currentTime;
-                const now = performance.now();
-                
-                // Track audio time changes for drift detection
-                if (audioTime !== this.lastAudioTime) {
-                    this.lastAudioTime = audioTime;
-                    this.audioTimeUpdateCount++;
-                }
-                
-                // Use audio time as primary, but validate with performance timing
-                if (this.audioFirstMode) {
-                    this.preciseCurrentTime = audioTime;
-                } else {
-                    // Combine audio timing with performance timing for better accuracy
-                    const performanceTime = this.playbackStartTime ? 
-                        (now - this.playbackStartTime - this.pausedDuration) / 1000 : audioTime;
-                    
-                    // Use audio time but smooth with performance timing
-                    const timeDiff = Math.abs(audioTime - performanceTime);
-                    if (timeDiff < 0.1) {
-                        this.preciseCurrentTime = audioTime;
-                    } else {
-                        this.preciseCurrentTime = performanceTime;
-                        this.log('warning', `Time sync drift detected: ${timeDiff.toFixed(3)}s`);
-                    }
-                }
-                
-                this.currentTime = this.preciseCurrentTime;
-            }
-            
-            handleSegmentTransition(targetSegment, now) {
-                // Check if we need to change segments
-                if (targetSegment !== this.activeSegment) {
-                    const segmentKey = targetSegment ? targetSegment.name : 'none';
-                    
-                    // Check if we already have a pending change for this segment
-                    if (this.pendingSegmentChanges.has(segmentKey)) {
-                        const pendingChange = this.pendingSegmentChanges.get(segmentKey);
-                        
-                        // Execute the change if enough time has passed
-                        if (now >= pendingChange.executeAt) {
-                            this.executeSegmentChange(targetSegment);
-                            this.pendingSegmentChanges.delete(segmentKey);
-                        }
-                    } else {
-                        // Schedule a new segment change
-                        const executeAt = now + this.transitionDelay;
-                        this.pendingSegmentChanges.set(segmentKey, {
-                            segment: targetSegment,
-                            executeAt: executeAt
-                        });
-                        
-                        this.log('info', `Scheduled segment change to: ${targetSegment ? targetSegment.display_name : 'none'} in ${this.transitionDelay}ms`);
-                    }
-                } else {
-                    // Clear any pending changes if we're staying in the same segment
-                    const currentKey = this.activeSegment ? this.activeSegment.name : 'none';
-                    if (this.pendingSegmentChanges.has(currentKey)) {
-                        this.pendingSegmentChanges.delete(currentKey);
-                    }
-                }
-            }
-            
-            executeSegmentChange(targetSegment) {
-                if (this.activeSegment) {
-                    this.deactivateSegment(this.activeSegment);
-                }
-                if (targetSegment) {
-                    this.activateSegment(targetSegment);
-                }
-                this.activeSegment = targetSegment;
-                
-                this.log('info', `Segment changed to: ${targetSegment ? targetSegment.display_name : 'none'}`);
-            }
-            
-            checkSyncDrift() {
-                const audioTime = this.newsAudio.currentTime;
-                const expectedTime = this.preciseCurrentTime;
-                this.syncDrift = (audioTime - expectedTime) * 1000; // Convert to ms
-                
-                // Auto-correct if drift exceeds tolerance
-                if (Math.abs(this.syncDrift) > this.syncTolerance && !this.audioFirstMode) {
-                    this.log('warning', `Auto-correcting sync drift: ${this.syncDrift.toFixed(1)}ms`);
-                    this.newsAudio.currentTime = expectedTime;
-                    this.syncDrift = 0;
-                }
-            }
-            
-            preloadSegmentMedia(segment) {
-                if (!segment.media || segment.media.length === 0) return;
-                
-                this.log('info', `Preloading media for: ${segment.display_name}`);
-                
-                // Preload images
-                const images = segment.media.filter(m => m.image);
-                images.forEach(media => {
-                    const img = new Image();
-                    let imgPath = media.path;
-                    if (!imgPath.startsWith('/')) {
-                        // If path starts with 'media/', use it as-is with leading slash
-                        // Otherwise assume it's just a filename and prepend '/media/'
-                        imgPath = imgPath.startsWith('media/') ? '/' + imgPath : '/media/' + imgPath;
-                    }
-                    img.src = imgPath;
-                    img.onload = () => this.log('info', `Preloaded image: ${media.image}`);
-                });
-                
-                // Mark as preloaded
-                this.preloadedMedia.set(segment.name, true);
-            }
+
             
             async activateSegment(segment) {
                 this.log('info', `Activating segment: ${segment.display_name}`);
@@ -1629,11 +1284,15 @@
             seekToTime(time) {
                 this.log('info', `Seeking to ${this.formatTime(time)}`);
                 
-                this.currentTime = Math.max(0, Math.min(time, this.totalDuration));
-                this.newsAudio.currentTime = this.currentTime;
+                const newTime = Math.max(0, Math.min(time, this.totalDuration));
+                this.newsAudio.currentTime = newTime;
                 
-                this.updateTimeline();
-                this.log('info', `Seeked to ${this.formatTime(this.currentTime)}`);
+                // Update background music if playing
+                if (this.backgroundAudio.src && this.isPlaying) {
+                    this.backgroundAudio.currentTime = newTime;
+                }
+                
+                this.log('info', `Seeked to ${this.formatTime(newTime)}`);
             }
             
             seekToSegment(index) {
@@ -1740,162 +1399,7 @@
                 }
             }
             
-            // Sync control methods
-            updateSyncSetting(setting, value) {
-                const numValue = parseInt(value);
-                
-                switch (setting) {
-                    case 'offset':
-                        this.syncOffset = numValue;
-                        document.getElementById('syncOffsetValue').textContent = `${numValue}ms`;
-                        this.log('info', `Sync offset set to: ${numValue}ms`);
-                        break;
-                    case 'tolerance':
-                        this.syncTolerance = numValue;
-                        document.getElementById('syncToleranceValue').textContent = `${numValue}ms`;
-                        this.log('info', `Sync tolerance set to: ${numValue}ms`);
-                        break;
-                    case 'preload':
-                        this.preloadTime = numValue;
-                        document.getElementById('preloadTimeValue').textContent = `${numValue}ms`;
-                        this.log('info', `Preload time set to: ${numValue}ms`);
-                        break;
-                    case 'transition':
-                        this.transitionDelay = numValue;
-                        document.getElementById('transitionDelayValue').textContent = `${numValue}ms`;
-                        this.log('info', `Transition delay set to: ${numValue}ms`);
-                        break;
-                }
-            }
-            
-            calibrateSync() {
-                this.log('info', 'Starting automatic sync calibration...');
-                
-                // Simple calibration: analyze recent sync drift patterns
-                if (this.audioTimeUpdateCount > 10) {
-                    const avgDrift = this.syncDrift;
-                    const calibrationOffset = this.syncOffset - Math.round(avgDrift);
-                    
-                    // Apply calibration with bounds checking
-                    this.syncOffset = Math.max(-1000, Math.min(1000, calibrationOffset));
-                    document.getElementById('syncOffset').value = this.syncOffset;
-                    document.getElementById('syncOffsetValue').textContent = `${this.syncOffset}ms`;
-                    
-                    this.log('info', `Auto-calibrated sync offset to: ${this.syncOffset}ms (was drift: ${avgDrift.toFixed(1)}ms)`);
-                } else {
-                    this.log('warning', 'Not enough playback data for calibration. Play for a few seconds first.');
-                }
-            }
-            
-            resetSync() {
-                this.log('info', 'Resetting sync settings to defaults');
-                
-                // Reset to defaults
-                this.syncOffset = 300;
-                this.syncTolerance = 100;
-                this.preloadTime = 500;
-                this.transitionDelay = 200;
-                this.audioFirstMode = false;
-                
-                // Update UI
-                document.getElementById('syncOffset').value = this.syncOffset;
-                document.getElementById('syncTolerance').value = this.syncTolerance;
-                document.getElementById('preloadTime').value = this.preloadTime;
-                document.getElementById('transitionDelay').value = this.transitionDelay;
-                
-                document.getElementById('syncOffsetValue').textContent = `${this.syncOffset}ms`;
-                document.getElementById('syncToleranceValue').textContent = `${this.syncTolerance}ms`;
-                document.getElementById('preloadTimeValue').textContent = `${this.preloadTime}ms`;
-                document.getElementById('transitionDelayValue').textContent = `${this.transitionDelay}ms`;
-                
-                this.setManualMode();
-            }
-            
-            toggleAudioFirst() {
-                this.audioFirstMode = !this.audioFirstMode;
-                
-                const audioFirstBtn = document.getElementById('audioFirstMode');
-                const manualBtn = document.getElementById('manualSyncMode');
-                
-                if (this.audioFirstMode) {
-                    audioFirstBtn.classList.add('active');
-                    manualBtn.classList.remove('active');
-                    this.log('info', 'Audio-first mode enabled');
-                } else {
-                    audioFirstBtn.classList.remove('active');
-                    manualBtn.classList.add('active');
-                    this.log('info', 'Audio-first mode disabled');
-                }
-            }
-            
-            setManualMode() {
-                this.audioFirstMode = false;
-                document.getElementById('audioFirstMode').classList.remove('active');
-                document.getElementById('manualSyncMode').classList.add('active');
-                this.log('info', 'Manual sync mode enabled');
-            }
-            
-            handleKeyboardShortcuts(event) {
-                // Only handle shortcuts when not typing in inputs
-                if (event.target.tagName === 'INPUT') return;
-                
-                switch (event.key) {
-                    case '[':
-                        event.preventDefault();
-                        this.adjustSyncOffset(-50);
-                        break;
-                    case ']':
-                        event.preventDefault();
-                        this.adjustSyncOffset(50);
-                        break;
-                    case ';':
-                        event.preventDefault();
-                        this.adjustSyncOffset(-10);
-                        break;
-                    case "'":
-                        event.preventDefault();
-                        this.adjustSyncOffset(10);
-                        break;
-                    case 'p':
-                    case 'P':
-                        event.preventDefault();
-                        this.toggleAudioFirst();
-                        break;
-                }
-            }
-            
-            adjustSyncOffset(delta) {
-                this.syncOffset = Math.max(-1000, Math.min(1000, this.syncOffset + delta));
-                document.getElementById('syncOffset').value = this.syncOffset;
-                document.getElementById('syncOffsetValue').textContent = `${this.syncOffset}ms`;
-                this.log('info', `Sync offset adjusted to: ${this.syncOffset}ms`);
-            }
-            
-            updateSyncStatus() {
-                const indicator = document.getElementById('syncStatusIndicator');
-                const statusText = document.getElementById('syncStatusText');
-                const driftText = document.getElementById('syncDriftText');
-                
-                // Update drift display
-                driftText.textContent = `${this.syncDrift.toFixed(1)}ms`;
-                
-                // Update status based on drift and mode
-                const absDrift = Math.abs(this.syncDrift);
-                
-                if (this.audioFirstMode) {
-                    indicator.className = 'sync-indicator';
-                    statusText.textContent = 'Audio Priority';
-                } else if (absDrift <= this.syncTolerance / 2) {
-                    indicator.className = 'sync-indicator';
-                    statusText.textContent = 'In Sync';
-                } else if (absDrift <= this.syncTolerance) {
-                    indicator.className = 'sync-indicator warning';
-                    statusText.textContent = 'Minor Drift';
-                } else {
-                    indicator.className = 'sync-indicator error';
-                    statusText.textContent = 'Sync Issue';
-                }
-            }
+
             
             duckBackgroundMusic() {
                 // Smoothly reduce background music to 20% when main news audio plays

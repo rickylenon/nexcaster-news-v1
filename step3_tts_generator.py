@@ -508,15 +508,37 @@ def main():
     # Combine all audio segments into one file
     combined_result = combine_audio_segments(audio_results, audio_dir)
     
-    # Update metadata to include combined file info
+    # Calculate start and end times for each segment
+    cumulative_time = 0
+    updated_audio_results = []
+    
+    print("\n=== Calculating Segment Timing ===")
+    for result in audio_results:
+        start_time = cumulative_time
+        end_time = start_time + result['duration']
+        
+        # Add timing information to the segment
+        updated_result = result.copy()
+        updated_result['start_time'] = round(start_time, 3)
+        updated_result['end_time'] = round(end_time, 3)
+        
+        print(f"  {result['display_name']}: {start_time:.3f}s - {end_time:.3f}s (duration: {result['duration']:.3f}s)")
+        
+        updated_audio_results.append(updated_result)
+        cumulative_time = end_time
+    
+    print(f"Total manifest duration: {cumulative_time:.3f}s ({cumulative_time/60:.2f} minutes)")
+    
+    # Update metadata to include combined file info and timing
     final_metadata = {
-        "individual_segments": audio_results,
+        "individual_segments": updated_audio_results,
         "combined_audio": combined_result,
         "generation_info": {
             "tts_service": TTS_USE,
             "language": LANGUAGE,
-            "total_segments": len(audio_results),
-            "timestamp": datetime.now().isoformat() if 'datetime' in globals() else None
+            "total_segments": len(updated_audio_results),
+            "total_duration": round(cumulative_time, 3),
+            "timestamp": datetime.now().isoformat()
         }
     }
     
@@ -526,7 +548,7 @@ def main():
         json.dump(final_metadata, f, indent=2, ensure_ascii=False)
     
     print(f"\n🎯 Audio generation complete!")
-    print(f"Generated {len(audio_results)} individual audio files in {LANGUAGE}")
+    print(f"Generated {len(updated_audio_results)} individual audio files in {LANGUAGE}")
     print(f"Audio files saved in: {audio_dir}")
     print(f"Manifest saved to: {news_manifest_path}")
     
@@ -536,11 +558,12 @@ def main():
         print(f"  Duration: {combined_result['total_duration']:.1f}s ({combined_result['total_duration']/60:.1f} minutes)")
         print(f"  Segments: {combined_result['segment_count']}")
     
-    # Display summary of generated files
-    print(f"\n📁 Generated audio segments:")
-    for result in audio_results:
+    # Display summary of generated files with timing
+    print(f"\n📁 Generated audio segments with timing:")
+    for result in updated_audio_results:
         service_info = f"({result['tts_service']}: {result['voice_used']})"
-        print(f"  - {result['display_name']}: {result['audio_file']} {service_info}")
+        timing_info = f"[{result['start_time']:.1f}s - {result['end_time']:.1f}s]"
+        print(f"  - {result['display_name']}: {result['audio_file']} {timing_info} {service_info}")
 
 if __name__ == "__main__":
     main()
