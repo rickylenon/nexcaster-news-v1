@@ -34,7 +34,7 @@ def apply_filipino_replacements(text):
         if original.isalpha() or original.endswith('.'):
             # For abbreviations and words, use word boundaries
             pattern = r'\b' + re.escape(original) + r'\b'
-            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+            text = re.sub(pattern, replacement, text)
         else:
             # For symbols and other characters, simple replacement
             text = text.replace(original, replacement)
@@ -48,7 +48,7 @@ def apply_spell_out_replacements(text):
     for original, replacement in spell_out.items():
         # Use word boundaries to match complete terms
         pattern = r'\b' + re.escape(original) + r'\b'
-        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+        text = re.sub(pattern, replacement, text)
     
     return text
 

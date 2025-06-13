@@ -117,6 +117,76 @@
             height: 100%;
             object-fit: cover;
             display: none;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        /* Ken Burns Effect Animations */
+        .main-image.ken-burns {
+            animation-duration: 15s;
+            animation-timing-function: ease-in-out;
+            animation-fill-mode: forwards;
+        }
+
+        .main-image.ken-burns-1 {
+            animation-name: kenBurns1;
+        }
+
+        .main-image.ken-burns-2 {
+            animation-name: kenBurns2;
+        }
+
+        .main-image.ken-burns-3 {
+            animation-name: kenBurns3;
+        }
+
+        .main-image.ken-burns-4 {
+            animation-name: kenBurns4;
+        }
+
+        /* Ken Burns Keyframes - Various panning and zooming effects */
+        @keyframes kenBurns1 {
+            0% {
+                transform: scale(1.1) translate(0%, 0%);
+            }
+            100% {
+                transform: scale(1.3) translate(-2%, -2%);
+            }
+        }
+
+        @keyframes kenBurns2 {
+            0% {
+                transform: scale(1.2) translate(2%, 0%);
+            }
+            100% {
+                transform: scale(1.1) translate(-1%, -3%);
+            }
+        }
+
+        @keyframes kenBurns3 {
+            0% {
+                transform: scale(1.0) translate(-2%, 2%);
+            }
+            100% {
+                transform: scale(1.25) translate(1%, -1%);
+            }
+        }
+
+        @keyframes kenBurns4 {
+            0% {
+                transform: scale(1.15) translate(1%, -2%);
+            }
+            100% {
+                transform: scale(1.05) translate(-2%, 1%);
+            }
+        }
+
+        /* Fade transition between images */
+        .main-image.fade-out {
+            opacity: 0;
+        }
+
+        .main-image.fade-in {
+            opacity: 1;
         }
 
         .lower-third {
@@ -124,7 +194,7 @@
             bottom: 0;
             left: 0;
             right: 0;
-            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            background: linear-gradient(135deg, #024482 0%, #00284d 100%);
             -webkit-backdrop-filter: blur(10px);
             backdrop-filter: blur(10px);
             border-top: 3px solid #fff;
@@ -486,6 +556,60 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Channel Branding */
+        .channel-branding {
+            position: absolute;
+            top: 15px;
+            z-index: 200;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-weight: bold;
+            font-size: 1em;
+            padding: 6px 12px;
+            border-radius: 6px;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+            transition: all 0.3s ease;
+            opacity: 0.9;
+        }
+
+        .channel-branding:hover {
+            opacity: 1;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        .channel-branding.left {
+            left: 15px;
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.4);
+        }
+
+        .channel-branding.right {
+            right: 15px;
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.4);
+        }
+
+        @media (max-width: 768px) {
+            .channel-branding {
+                font-size: 0.85em;
+                padding: 5px 10px;
+                top: 12px;
+            }
+            
+            .channel-branding.left {
+                left: 12px;
+            }
+            
+            .channel-branding.right {
+                right: 12px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -528,6 +652,14 @@
                 </video>
                 
                 <img id="mainImage" class="main-image" alt="News Image">
+
+                <!-- Channel Branding -->
+                <div class="channel-branding left">
+                    📍 PULILAN
+                </div>
+                <div class="channel-branding right">
+                    📺 NEWS
+                </div>
 
                 <div id="lowerThird" class="lower-third" style="display: none;">
                     <div class="lower-third-content">
@@ -637,7 +769,7 @@
                 this.activeSegment = null;
                 this.debugMode = false;
                 this.isLoading = false;
-                this.pendingMediaSegment = null;
+                this.pendingMediaSegment = null; // Track segments waiting for media display
                 
                 // Media rotation
                 this.imageRotationInterval = null;
@@ -1081,6 +1213,7 @@
                 this.mainVideo.pause();
                 this.mainVideo.currentTime = 0;
                 this.mainVideo.src = '';
+                this.mainVideo.loop = false; // Reset loop when stopping
                 
                 // Hide media elements
                 this.mainVideo.style.display = 'none';
@@ -1265,8 +1398,9 @@
                     this.restoreBackgroundMusic();
                 }
                 
-                // Clear image rotation when segment ends
+                // Clear image rotation and Ken Burns effects when segment ends
                 this.clearImageRotation();
+                this.clearImageKenBurns();
                 
                 this.log('info', `✅ Segment "${segment.display_name}" deactivated successfully`);
             }
@@ -1295,15 +1429,28 @@
                         this.currentImageIndex = (this.currentImageIndex + 1) % images.length;
                         const selectedImage = images[this.currentImageIndex];
                         
-                        // Update image display
-                        let imagePath = selectedImage.path;
-                        if (!imagePath.startsWith('/')) {
-                            // If path starts with 'media/', use it as-is with leading slash
-                            // Otherwise assume it's just a filename and prepend '/media/'
-                            imagePath = imagePath.startsWith('media/') ? '/' + imagePath : '/media/' + imagePath;
-                        }
-                        this.mainImage.src = imagePath;
-                        this.log('info', `🔄 ROTATED to image ${this.currentImageIndex + 1}/${images.length}: "${selectedImage.image}" at ${this.formatTime(rotationTime)}`);
+                        // Add fade transition for smooth image rotation
+                        this.mainImage.classList.add('fade-out');
+                        
+                        setTimeout(() => {
+                            // Update image display
+                            let imagePath = selectedImage.path;
+                            if (!imagePath.startsWith('/')) {
+                                // If path starts with 'media/', use it as-is with leading slash
+                                // Otherwise assume it's just a filename and prepend '/media/'
+                                imagePath = imagePath.startsWith('media/') ? '/' + imagePath : '/media/' + imagePath;
+                            }
+                            this.mainImage.src = imagePath;
+                            this.applyKenBurnsEffect();
+                            this.mainImage.classList.remove('fade-out');
+                            this.mainImage.classList.add('fade-in');
+                            
+                            setTimeout(() => {
+                                this.mainImage.classList.remove('fade-in');
+                            }, 500);
+                            
+                            this.log('info', `🔄 ROTATED to image ${this.currentImageIndex + 1}/${images.length} with Ken Burns: "${selectedImage.image}" at ${this.formatTime(rotationTime)}`);
+                        }, 250);
                     }, rotationInterval);
                 } else {
                     this.log('info', `📸 Single image mode - no rotation needed for "${segment.display_name}"`);
@@ -1319,6 +1466,25 @@
                 }
             }
             
+            applyKenBurnsEffect() {
+                // Clear any existing Ken Burns classes
+                this.clearImageKenBurns();
+                
+                // Randomly select one of the 4 Ken Burns animations
+                const kenBurnsVariants = ['ken-burns-1', 'ken-burns-2', 'ken-burns-3', 'ken-burns-4'];
+                const randomVariant = kenBurnsVariants[Math.floor(Math.random() * kenBurnsVariants.length)];
+                
+                // Apply the Ken Burns effect
+                this.mainImage.classList.add('ken-burns', randomVariant);
+                
+                this.log('info', `🎬 Applied Ken Burns effect: ${randomVariant}`);
+            }
+            
+            clearImageKenBurns() {
+                // Remove all Ken Burns classes
+                this.mainImage.classList.remove('ken-burns', 'ken-burns-1', 'ken-burns-2', 'ken-burns-3', 'ken-burns-4', 'fade-in', 'fade-out');
+            }
+            
             async displaySegmentMedia(segment) {
                 const displayTime = this.newsAudio.currentTime;
                 
@@ -1326,6 +1492,7 @@
                     // No media for this segment - hide both video and image
                     this.mainVideo.style.display = 'none';
                     this.mainImage.style.display = 'none';
+                    this.clearImageKenBurns();
                     this.log('info', `📺 No media to display for segment: "${segment.display_name}" at ${this.formatTime(displayTime)}`);
                     return;
                 }
@@ -1343,8 +1510,24 @@
                     // Display first video
                     const media = videos[0];
                     this.log('info', `🎬 Switching to VIDEO mode: "${media.video}"`);
+                    this.clearImageKenBurns();
                     this.mainImage.style.display = 'none';
                     this.mainVideo.style.display = 'block';
+                    
+                    // Check if this is an intro or outro segment for looping
+                    const isIntroOrOutro = segment._isOutro || 
+                                         segment.name === 'intro' || 
+                                         segment.name === 'opening_greeting' ||
+                                         segment.display_name.toLowerCase().includes('intro') ||
+                                         segment.display_name.toLowerCase().includes('outro');
+                    
+                    if (isIntroOrOutro) {
+                        this.mainVideo.loop = true;
+                        this.log('info', `🔄 Video loop enabled for intro/outro segment: "${segment.display_name}"`);
+                    } else {
+                        this.mainVideo.loop = false;
+                        this.log('info', `📹 Video loop disabled for regular segment: "${segment.display_name}"`);
+                    }
                     
                     // Ensure absolute path for video
                     let videoPath = media.path;
@@ -1378,9 +1561,11 @@
                     
                     this.log('info', `🖼️ Loading image: ${imagePath}`);
                     this.mainImage.src = imagePath;
-                    this.log('info', `✅ Image displayed: "${selectedImage.image}" at ${this.formatTime(this.newsAudio.currentTime)}`);
+                    this.applyKenBurnsEffect();
+                    this.log('info', `✅ Image displayed with Ken Burns effect: "${selectedImage.image}" at ${this.formatTime(this.newsAudio.currentTime)}`);
                 } else {
                     this.log('warning', `⚠️ No displayable media found for "${segment.display_name}" - hiding all media elements`);
+                    this.clearImageKenBurns();
                     this.mainVideo.style.display = 'none';
                     this.mainImage.style.display = 'none';
                 }
@@ -1413,7 +1598,7 @@
                 const currentTime = this.newsAudio.currentTime;
                 
                 if (segment && segment.headline) {
-                    // Show lower-third for headline segments
+                    // Show lower-third for segments with headline data (headlines and news stories)
                     if (lowerThird.style.display !== 'block') {
                         this.log('info', `📰 SHOWING LOWER-THIRD at ${this.formatTime(currentTime)} for "${segment.display_name}"`);
                         this.log('info', `📰 Headline: "${segment.headline.text}"`);
@@ -1426,9 +1611,9 @@
                     document.getElementById('newsLocation').textContent = segment.headline.location;
                     lowerThird.style.display = 'block';
                 } else {
-                    // Hide lower-third for non-headline segments
+                    // Hide lower-third for segments without headline data
                     if (lowerThird.style.display !== 'none') {
-                        this.log('info', `📰 HIDING LOWER-THIRD at ${this.formatTime(currentTime)} - non-headline segment`);
+                        this.log('info', `📰 HIDING LOWER-THIRD at ${this.formatTime(currentTime)} - segment without headline data "${segment ? segment.display_name : 'none'}"`);
                     }
                     lowerThird.style.display = 'none';
                 }

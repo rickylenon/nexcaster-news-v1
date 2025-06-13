@@ -66,8 +66,13 @@ def map_media_to_segments(manifest, news_data):
             print(f"  ✅ Added outro.mp4")
             
         elif segment_type == 'headline_opening':
-            # No media for headline opening - it's just the introduction
-            print(f"  📢 Headline opening - no media needed")
+            # headline_opening
+            segment['media'].append({
+                "video": "babad.mp4", 
+                "path": "media/babad.mp4",
+                "type": "babad_video"
+            })
+            print(f"  ✅ Added outro.mp4")
             
         elif segment_type == 'headline':
             # For headlines, extract the number from display_name (e.g., "News Headline 1" -> 1)
@@ -134,6 +139,29 @@ def map_media_to_segments(manifest, news_data):
                 news_index = news_number - 1  # Convert to 0-based index
                 if news_index >= 0 and news_index < len(news_data):
                     news_item = news_data[news_index]
+                    
+                    # Find the corresponding headline segment to copy headline info from
+                    corresponding_headline = None
+                    for header_segment in manifest['individual_segments']:
+                        if (header_segment['segment_type'] == 'headline' and 
+                            f"News Headline {news_number}" in header_segment.get('display_name', '')):
+                            corresponding_headline = header_segment
+                            break
+                    
+                    # Add headline data for lower-third display (copy from corresponding headline)
+                    if corresponding_headline and corresponding_headline.get('headline'):
+                        segment['headline'] = corresponding_headline['headline'].copy()
+                        print(f"  ✅ Added headline info from 'News Headline {news_number}' to news story")
+                    else:
+                        # Fallback: create headline info based on the original news title
+                        segment['headline'] = {
+                            "text": news_item.get('title', segment.get('script', '')[:100] + '...'),
+                            "location": "Pulilan, Bulacan",
+                            "category": "Breaking News" if news_number == 1 else "Local News",
+                            "priority": "high" if news_number == 1 else "normal",
+                            "timestamp": "LIVE"
+                        }
+                        print(f"  ✅ Added fallback headline info for news story {news_number}")
                     
                     # Add all media from corresponding news item
                     if news_item.get('media'):
