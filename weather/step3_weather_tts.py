@@ -14,6 +14,63 @@ from pydub import AudioSegment
 from dotenv import load_dotenv
 from config import TTS_CONFIG, LANGUAGE, OPENAI_API_KEY
 
+def get_media_files_for_segment(segment_type):
+    """Get media files associated with a weather segment"""
+    media_dir = os.path.join('generated', 'media')
+    media_files = []
+    
+    if not os.path.exists(media_dir):
+        return media_files
+    
+    # Map segment types to potential media file patterns
+    segment_to_media_map = {
+        'weather_map1': ['weather_map1.webm'],
+        'weather_map2': ['weather_map2.webm'],
+        'card_temperature': ['card-temperature.webm'],
+        'card_feels_like': ['card-feels-like.webm'],
+        'card_cloud_cover': ['card-cloud-cover.webm'],
+        'card_precipitation': ['card-precipitation.webm'],
+        'card_wind': ['card-wind.webm'],
+        'card_humidity': ['card-humidity.webm'],
+        'card_uv': ['card-uv.webm'],
+        'card_aqi': ['card-aqi.webm'],
+        'card_visibility': ['card-visibility.webm'],
+        'card_pressure': ['card-pressure.webm'],
+        'card_sun': ['card-sun.webm'],
+        'card_moon': ['card-moon.webm'],
+        'card_current': ['card-current.webm'],
+        'card_hourly': ['card-hourly.webm'],
+        'weather_overview': ['weather_overview.webm'],
+        'weather_current_overview': ['weather_current_overview.webm']
+    }
+    
+    # Get potential file names for this segment
+    potential_files = segment_to_media_map.get(segment_type, [])
+    
+    for media_filename in potential_files:
+        media_path = os.path.join(media_dir, media_filename)
+        if os.path.exists(media_path):
+            try:
+                # Get file size in MB
+                file_size_bytes = os.path.getsize(media_path)
+                file_size_mb = round(file_size_bytes / (1024 * 1024), 2)
+                
+                media_info = {
+                    "video": media_filename,
+                    "path": os.path.join("media", media_filename).replace("\\", "/"),
+                    "type": f"{segment_type}_video",
+                    "original_name": media_filename,
+                    "size_mb": file_size_mb
+                }
+                media_files.append(media_info)
+                
+                print(f"    📹 Found media: {media_filename} ({file_size_mb} MB)")
+                
+            except Exception as e:
+                print(f"    ⚠️  Warning: Could not process media file {media_filename}: {e}")
+    
+    return media_files
+
 # Load environment variables from .env file
 load_dotenv()
 print(f"Loaded environment variables from .env file")
@@ -224,7 +281,10 @@ def generate_audio_with_elevenlabs_tts(segment, output_dir):
             print(f"Warning: Could not measure audio duration: {e}")
             actual_duration = segment["duration"]  # Fallback to estimated
         
-        return {
+        # Get associated media files
+        media_files = get_media_files_for_segment(segment["segment_type"])
+        
+        result = {
             "segment_type": segment["segment_type"],
             "display_name": segment["display_name"],
             "audio_file": audio_filename,
@@ -236,6 +296,12 @@ def generate_audio_with_elevenlabs_tts(segment, output_dir):
             "voice_used": TTS_CONFIG["elevenlabs"]["voice_id"],
             "tts_service": "ElevenLabs"
         }
+        
+        # Add media information if available
+        if media_files:
+            result["media"] = media_files
+            
+        return result
         
     except Exception as e:
         print(f"Error generating audio with ElevenLabs TTS for {segment['segment_type']}: {e}")
@@ -302,7 +368,10 @@ def generate_audio_with_google_tts(segment, output_dir):
             print(f"Warning: Could not measure audio duration: {e}")
             actual_duration = segment["duration"]  # Fallback to estimated
         
-        return {
+        # Get associated media files
+        media_files = get_media_files_for_segment(segment["segment_type"])
+        
+        result = {
             "segment_type": segment["segment_type"],
             "display_name": segment["display_name"],
             "audio_file": audio_filename,
@@ -314,6 +383,12 @@ def generate_audio_with_google_tts(segment, output_dir):
             "voice_used": TTS_CONFIG["google"]["voice_name"],
             "tts_service": "Google Cloud"
         }
+        
+        # Add media information if available
+        if media_files:
+            result["media"] = media_files
+            
+        return result
         
     except Exception as e:
         print(f"Error generating audio with Google TTS for {segment['segment_type']}: {e}")
@@ -368,7 +443,10 @@ def generate_audio_with_openai_tts(segment, output_dir):
             print(f"Warning: Could not measure audio duration: {e}")
             actual_duration = segment["duration"]  # Fallback to estimated
         
-        return {
+        # Get associated media files
+        media_files = get_media_files_for_segment(segment["segment_type"])
+        
+        result = {
             "segment_type": segment["segment_type"],
             "display_name": segment["display_name"],
             "audio_file": audio_filename,
@@ -380,6 +458,12 @@ def generate_audio_with_openai_tts(segment, output_dir):
             "voice_used": voice,
             "tts_service": "OpenAI"
         }
+        
+        # Add media information if available
+        if media_files:
+            result["media"] = media_files
+            
+        return result
         
     except Exception as e:
         print(f"Error generating audio with OpenAI TTS for {segment['segment_type']}: {e}")
@@ -531,7 +615,10 @@ def main():
                     print(f"    ⚠️  Warning: Could not measure audio duration: {e}")
                     actual_duration = segment.get("duration", 0)  # Fallback to estimated
                 
-                audio_results.append({
+                # Get associated media files
+                media_files = get_media_files_for_segment(segment["segment_type"])
+                
+                result = {
                     "segment_type": segment["segment_type"],
                     "display_name": segment["display_name"],
                     "audio_file": audio_filename,
@@ -542,7 +629,13 @@ def main():
                     "language": LANGUAGE,
                     "voice_used": TTS_CONFIG['openai']['voice'] if TTS_CONFIG['provider'] == 'openai' else TTS_CONFIG['elevenlabs']['voice_id'],
                     "tts_service": TTS_CONFIG['provider']
-                })
+                }
+                
+                # Add media information if available
+                if media_files:
+                    result["media"] = media_files
+                    
+                audio_results.append(result)
             else:
                 print(f"  ❌ Missing: {audio_filename}")
     else:

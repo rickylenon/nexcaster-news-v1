@@ -54,13 +54,13 @@ CORS(app)  # Enable CORS for all routes
 
 # Configuration
 class Config:
-    DATA_DIR = 'data'
-    MULTIMEDIA_DIR = os.path.join('data', 'multimedia')
-    OUTPUT_DIR = os.path.join('data', 'output')
+    DATA_DIR = 'generated'
+    MULTIMEDIA_DIR = os.path.join('generated', 'media')
+    AUDIO_DIR = os.path.join('generated', 'audio')
     WEATHER_DATA_PATTERNS = [
-        'enhanced_msn_weather_*.json',
-        'job_*_weather.json',
-        '*weather*.json'
+        'weather_data.json',
+        'weather_manifest.json',
+        'weather_scripts.json'
     ]
     # Allowed file extensions for serving
     ALLOWED_EXTENSIONS = {
@@ -93,42 +93,21 @@ def get_file_extension(filename):
     return filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
 
 def find_weather_files():
-    """Find all weather data files in the data directory"""
+    """Find all weather data files in the generated directory"""
     weather_files = []
     
-    # First check for the latest weather data file
-    latest_file = os.path.join(app.config['DATA_DIR'], 'latest', 'weather_data.json')
-    if os.path.exists(latest_file):
-        rel_path = os.path.relpath(latest_file, app.config['DATA_DIR'])
-        weather_files.append({
-            'filename': os.path.basename(latest_file),
-            'path': rel_path,
-            'full_path': latest_file,
-            'size': os.path.getsize(latest_file),
-            'modified': datetime.fromtimestamp(os.path.getmtime(latest_file)).isoformat()
-        })
-    
-    # Then search in other directories for additional files
-    search_dirs = [
-        os.path.join(app.config['DATA_DIR'], 'weather'),
-        os.path.join(app.config['DATA_DIR'], 'weather', 'raw')
-    ]
-    
-    for search_dir in search_dirs:
-        if os.path.exists(search_dir):
-            for pattern in app.config['WEATHER_DATA_PATTERNS']:
-                pattern_path = os.path.join(search_dir, pattern)
-                files = glob.glob(pattern_path)
-                for file_path in files:
-                    # Get relative path from data directory
-                    rel_path = os.path.relpath(file_path, app.config['DATA_DIR'])
-                    weather_files.append({
-                        'filename': os.path.basename(file_path),
-                        'path': rel_path,
-                        'full_path': file_path,
-                        'size': os.path.getsize(file_path),
-                        'modified': datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat()
-                    })
+    # Check for weather data files in the generated directory
+    for pattern in app.config['WEATHER_DATA_PATTERNS']:
+        file_path = os.path.join(app.config['DATA_DIR'], pattern)
+        if os.path.exists(file_path):
+            rel_path = os.path.relpath(file_path, app.config['DATA_DIR'])
+            weather_files.append({
+                'filename': os.path.basename(file_path),
+                'path': rel_path,
+                'full_path': file_path,
+                'size': os.path.getsize(file_path),
+                'modified': datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat()
+            })
     
     # Sort by modification time (newest first)
     weather_files.sort(key=lambda x: x['modified'], reverse=True)
@@ -307,7 +286,7 @@ def api_health():
         
         # Check multimedia directories
         multimedia_dirs = []
-        for dir_path in [app.config['MULTIMEDIA_DIR'], app.config.get('OUTPUT_DIR')]:
+        for dir_path in [app.config['MULTIMEDIA_DIR'], app.config.get('AUDIO_DIR')]:
             if dir_path and os.path.exists(dir_path):
                 multimedia_dirs.append({
                     'path': dir_path,
@@ -321,8 +300,8 @@ def api_health():
                     'files': 0
                 })
         
-        # Check for manifest.json
-        manifest_file = os.path.join(app.config['DATA_DIR'], 'latest', 'manifest.json')
+        # Check for weather_manifest.json
+        manifest_file = os.path.join(app.config['DATA_DIR'], 'weather_manifest.json')
         manifest_available = os.path.exists(manifest_file)
         
         return jsonify({
@@ -448,13 +427,13 @@ def api_weather_file(filename):
 def api_weather_manifest():
     """Get the weather media manifest with subtitle timing"""
     try:
-        manifest_file = os.path.join(app.config['DATA_DIR'], 'latest', 'manifest.json')
+        manifest_file = os.path.join(app.config['DATA_DIR'], 'weather_manifest.json')
         
         if not os.path.exists(manifest_file):
             return jsonify({
                 'status': 'error',
                 'error': 'Weather manifest not found',
-                'message': 'Run subtitle_generator.py to create the manifest',
+                'message': 'Generate weather manifest to create the file',
                 'timestamp': datetime.now().isoformat()
             }), 404
         
@@ -555,18 +534,9 @@ def serve_multimedia(filename):
         # Search in multimedia directories
         search_dirs = [
             app.config['MULTIMEDIA_DIR'],
-            os.path.join(app.config['MULTIMEDIA_DIR'], 'latest'),
-            app.config['DATA_DIR'],
-            os.path.join(app.config['DATA_DIR'], 'latest'),
-            app.config.get('OUTPUT_DIR', os.path.join(app.config['DATA_DIR'], 'output'))
+            app.config.get('AUDIO_DIR', os.path.join(app.config['DATA_DIR'], 'audio')),
+            app.config['DATA_DIR']
         ]
-        
-        # Also search job-specific directories in multimedia
-        if os.path.exists(app.config['MULTIMEDIA_DIR']):
-            for item in os.listdir(app.config['MULTIMEDIA_DIR']):
-                item_path = os.path.join(app.config['MULTIMEDIA_DIR'], item)
-                if os.path.isdir(item_path):
-                    search_dirs.append(item_path)
         
         file_found = None
         for search_dir in search_dirs:
@@ -668,18 +638,9 @@ def list_media_files():
         # Search directories
         search_dirs = [
             app.config['MULTIMEDIA_DIR'],
-            os.path.join(app.config['MULTIMEDIA_DIR'], 'latest'),
-            app.config['DATA_DIR'],
-            os.path.join(app.config['DATA_DIR'], 'latest'),
-            app.config.get('OUTPUT_DIR', os.path.join(app.config['DATA_DIR'], 'output'))
+            app.config.get('AUDIO_DIR', os.path.join(app.config['DATA_DIR'], 'audio')),
+            app.config['DATA_DIR']
         ]
-        
-        # Add job-specific directories
-        if os.path.exists(app.config['MULTIMEDIA_DIR']):
-            for item in os.listdir(app.config['MULTIMEDIA_DIR']):
-                item_path = os.path.join(app.config['MULTIMEDIA_DIR'], item)
-                if os.path.isdir(item_path):
-                    search_dirs.append(item_path)
         
         for search_dir in search_dirs:
             if not os.path.exists(search_dir):
@@ -695,10 +656,10 @@ def list_media_files():
                         rel_path = os.path.relpath(file_path, search_dir)
                         
                         # Generate URL paths
-                        if search_dir.startswith(app.config['MULTIMEDIA_DIR']):
-                            url_path = f"/media/{rel_path}"
+                        if search_dir == app.config['MULTIMEDIA_DIR'] or search_dir == app.config.get('AUDIO_DIR'):
+                            url_path = f"/media/{file}"  # Direct file access for generated structure
                         else:
-                            url_path = f"/files/{rel_path}"
+                            url_path = f"/media/{rel_path}"
                         
                         media_files.append({
                             'filename': file,
@@ -788,14 +749,14 @@ def initialize_app():
         print(f"✅ Created data directory: {app.config['DATA_DIR']}")
     
     # Check and create multimedia directories
-    for dir_path in [app.config['MULTIMEDIA_DIR'], app.config.get('OUTPUT_DIR')]:
+    for dir_path in [app.config['MULTIMEDIA_DIR'], app.config.get('AUDIO_DIR')]:
         if dir_path:
             if not os.path.exists(dir_path):
                 print(f"⚠️  Warning: Directory '{dir_path}' does not exist")
                 os.makedirs(dir_path, exist_ok=True)
                 print(f"✅ Created directory: {dir_path}")
             else:
-                print(f"📁 Multimedia Directory: {os.path.abspath(dir_path)}")
+                print(f"📁 Directory: {os.path.abspath(dir_path)}")
     
     # Check for weather cards HTML
     if os.path.exists('weather_cards.html'):
@@ -825,9 +786,10 @@ def initialize_app():
     print("   GET /api/weather/list          - List all weather files")
     print("   GET /api/weather/latest        - Get latest weather data")
     print("   GET /api/weather/<filename>    - Get specific weather file")
+    print("   GET /api/weather/manifest      - Get weather manifest")
     print("   GET /api/media/list            - List all media files")
     print("   GET /data/<path:filename>      - Serve data files directly")
-    print("   GET /media/<path:filename>     - Serve multimedia files (json,webm,mp4,png,jpg)")
+    print("   GET /media/<path:filename>     - Serve multimedia files (json,webm,mp4,mp3,png,jpg)")
     print("   GET /files/<path:filename>     - Serve data files")
     print("   GET /test                      - API test page")
     print(f"\n🌐 Server will be available at: http://localhost:{app.config['PORT']}")
@@ -835,6 +797,7 @@ def initialize_app():
     print(f"🎭 Media Player: http://localhost:{app.config['PORT']}/player")
     print(f"🧪 Test Interface: http://localhost:{app.config['PORT']}/test")
     print(f"📁 Media Files List: http://localhost:{app.config['PORT']}/api/media/list")
+    print(f"📋 Weather Manifest: http://localhost:{app.config['PORT']}/api/weather/manifest")
     print("\n" + "=" * 60)
 
 if __name__ == '__main__':

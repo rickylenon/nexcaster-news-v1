@@ -674,54 +674,43 @@
                 this.log('info', 'Loading weather subtitle manifest...');
                 
                 try {
-                    const response = await fetch('data/latest/manifest.json');
+                    const response = await fetch('/api/weather/manifest');
                     if (!response.ok) {
                         throw new Error(`Failed to load manifest: ${response.status}`);
                     }
                     
-                    this.manifest = await response.json();
-                    this.totalDuration = this.manifest.metadata.total_duration;
+                    const responseData = await response.json();
+                    this.manifest = responseData.manifest;
                     
-                    // Get timing information from metadata
-                    const introDuration = this.manifest.metadata.intro_duration || 0;
-                    const outroDuration = this.manifest.metadata.outro_duration || 0;
-                    const mainAudioDuration = this.manifest.metadata.main_audio_duration || 0;
+                    // Use individual segments for sequential playback
+                    const segments = this.manifest.individual_segments;
+                    this.totalDuration = this.manifest.combined_audio.total_duration;
                     
-                    // Convert subtitles to media queue format for player
-                    this.mediaQueue = this.manifest.subtitles.map(subtitle => ({
-                        start_time: subtitle.start_time,
-                        end_time: subtitle.end_time,
-                        duration: subtitle.end_time - subtitle.start_time,
-                        media_type: subtitle.media_type,
-                        text: subtitle.text,
-                        confidence: subtitle.confidence,
-                        description: `${subtitle.text.substring(0, 100)}${subtitle.text.length > 100 ? '...' : ''}`,
-                        filepath: this.getMediaFilePath(subtitle.media_type)
+                    // Convert segments to simple playback queue
+                    this.mediaQueue = segments.map((segment, index) => ({
+                        index: index,
+                        segment_type: segment.segment_type,
+                        display_name: segment.display_name,
+                        audio_file: segment.audio_file,
+                        audio_path: `/media/${segment.audio_file}`,
+                        video_path: segment.media && segment.media[0] ? `/media/${segment.media[0].video}` : null,
+                        script: segment.script,
+                        headline: segment.headline,
+                        duration: segment.duration,
+                        start_time: segment.start_time,
+                        end_time: segment.end_time
                     }));
                     
-                    // Add main weather audio as a separate track (starts after intro)
-                    const mainAudioFile = {
-                        start_time: introDuration,
-                        end_time: introDuration + mainAudioDuration,
-                        duration: mainAudioDuration,
-                        media_type: 'main_weather_audio',
-                        text: 'Complete weather report audio',
-                        confidence: 1.0,
-                        description: 'Main weather report narration',
-                        filepath: `data/latest/audio/${this.manifest.metadata.source_audio}`,
-                        _isMainAudio: true  // Flag to identify main audio track
-                    };
-                    this.mediaQueue.unshift(mainAudioFile);
+                    // Current segment tracking
+                    this.currentSegmentIndex = 0;
+                    this.isSequentialPlayback = true;
                     
-                    // Sort by start time
-                    this.mediaQueue.sort((a, b) => a.start_time - b.start_time);
-                    
-                    this.log('info', `Manifest loaded: ${this.manifest.subtitles.length} subtitle segments, ${this.formatTime(this.totalDuration)} total duration`);
-                    this.log('info', `Timing: intro ${this.formatTime(introDuration)} + main audio ${this.formatTime(mainAudioDuration)} + outro ${this.formatTime(outroDuration)}`);
+                    this.log('info', `Manifest loaded: ${segments.length} segments for sequential playback`);
+                    this.log('info', `Total duration: ${this.formatTime(this.totalDuration)}`);
                     
                     // Update UI
-                    document.getElementById('mediaCount').textContent = `${this.manifest.subtitles.length} subtitle segments`;
-                    document.getElementById('playlistCount').textContent = `${this.mediaQueue.length} items`;
+                    document.getElementById('mediaCount').textContent = `${segments.length} segments`;
+                    document.getElementById('playlistCount').textContent = `${segments.length} items`;
                     this.totalTimeDisplay.textContent = this.formatTime(this.totalDuration);
                     
                     this.updateStatus('manifest', 'loaded');
@@ -733,22 +722,22 @@
                 }
             }
             
-            getMediaFilePath(mediaType) {
-                // Map media types to file paths based on actual available files
-                if (mediaType.includes('.mp4') || mediaType.includes('.webm')) {
-                    return `data/latest/multimedia/${mediaType}`;
-                } else if (mediaType.startsWith('card-')) {
-                    // Card types are already prefixed correctly
-                    return `data/latest/multimedia/${mediaType}.webm`;
-                } else if (mediaType === 'weather_map1') {
-                    return `data/latest/multimedia/card-weather_map1.webm`;
-                } else if (mediaType === 'weather_map2') {
-                    return `data/latest/multimedia/card-weather_map2.webm`;
-                } else if (mediaType.includes('intro') || mediaType.includes('outro')) {
-                    return `data/latest/multimedia/${mediaType}.mp4`;
+            getMediaFilePath(segment) {
+                // Simplified media path mapping for the actual generated structure
+                if (segment.media && segment.media[0]) {
+                    // Use the video from the segment's media array
+                    return `/media/${segment.media[0].video}`;
+                } else if (segment.segment_type === 'weather_map1') {
+                    return `/media/weather_map1.webm`;
+                } else if (segment.segment_type === 'weather_map2') {
+                    return `/media/weather_map2.webm`;
+                } else if (segment.segment_type.startsWith('card_')) {
+                    // Convert card_temperature to card-temperature.webm
+                    const cardName = segment.segment_type.replace('card_', 'card-');
+                    return `/media/${cardName}.webm`;
                 } else {
-                    // Default mapping - try card- prefix first
-                    return `data/latest/multimedia/card-${mediaType}.webm`;
+                    // Fallback - try direct mapping
+                    return `/media/${segment.segment_type}.webm`;
                 }
             }
             
@@ -765,11 +754,11 @@
                 // Set up background music if available (graceful fallback)
                 try {
                     // Try to find background music file in audio directory
-                    const response = await fetch('data/latest/audio/background_music.mp3', { method: 'HEAD' });
+                    const response = await fetch('/media/background_music.mp3', { method: 'HEAD' });
                     if (response.ok) {
-                        this.backgroundAudio.src = 'data/latest/audio/background_music.mp3';
+                        this.backgroundAudio.src = '/media/background_music.mp3';
                         this.backgroundAudio.volume = 0.15; // Lower background volume (15%)
-                        this.log('info', 'Background music set: data/latest/audio/background_music.mp3');
+                        this.log('info', 'Background music set: /media/background_music.mp3');
                     } else {
                         throw new Error('Background music not found');
                     }
@@ -856,41 +845,72 @@
                 
                 this.playlistContainer.innerHTML = '';
                 
-                this.mediaQueue.forEach((item, index) => {
+                this.mediaQueue.forEach((segment, index) => {
                     const playlistItem = document.createElement('div');
                     playlistItem.className = 'playlist-item';
                     playlistItem.dataset.index = index;
                     
                     playlistItem.innerHTML = `
-                        <h4>${this.getMediaDisplayName(item)}</h4>
-                        <div class="time">${this.formatTime(item.start_time)} - ${this.formatTime(item.end_time)}</div>
-                        <div class="description">${item.description || 'No description available'}</div>
+                        <h4>${this.getSegmentDisplayName(segment)}</h4>
+                        <div class="time">${this.formatTime(segment.duration)} duration</div>
+                        <div class="description">${segment.headline || 'No description available'}</div>
                     `;
                     
-                    playlistItem.addEventListener('click', () => this.seekToMediaItem(index));
+                    playlistItem.addEventListener('click', () => this.seekToSegment(index));
                     this.playlistContainer.appendChild(playlistItem);
                 });
                 
-                this.log('info', `Playlist populated with ${this.mediaQueue.length} items`);
+                this.log('info', `Playlist populated with ${this.mediaQueue.length} segments`);
             }
             
-            getMediaDisplayName(item) {
-                const forcedPrefix = item._forced ? '🔥 FORCED: ' : '';
+            getSegmentDisplayName(segment) {
+                const typeMap = {
+                    'weather_map1': '🗺️ Weather Map 1',
+                    'weather_map2': '🗺️ Weather Map 2', 
+                    'card_temperature': '🌡️ Temperature',
+                    'card_feels_like': '🔥 Feels Like',
+                    'card_cloud_cover': '☁️ Cloud Cover',
+                    'card_precipitation': '🌧️ Precipitation',
+                    'card_wind': '💨 Wind',
+                    'card_humidity': '💧 Humidity',
+                    'card_uv': '☀️ UV Index',
+                    'card_aqi': '🏭 Air Quality',
+                    'card_visibility': '👁️ Visibility',
+                    'card_pressure': '📊 Pressure',
+                    'card_sun': '🌅 Sun',
+                    'card_moon': '🌙 Moon',
+                    'card_current': '📋 Current',
+                    'card_hourly': '⏰ Hourly'
+                };
                 
-                if (item.media_type.includes('audio')) {
-                    return `${forcedPrefix}🎵 ${item.media_type.replace('_audio', '').replace('_', ' ')}`;
-                } else if (item.media_type.includes('card-')) {
-                    return `${forcedPrefix}📊 ${item.media_type.replace('card-', '').replace('-', ' ')}`;
-                } else if (item.media_type.includes('.mp4') || item.media_type.includes('.webm')) {
-                    return `${forcedPrefix}🎬 ${item.media_type.replace(/\.(mp4|webm)/, '')}`;
-                } else if (item.media_type.includes('weather_map')) {
-                    return `${forcedPrefix}🗺️ ${item.media_type.replace(/\.(mp4|webm)/, '')}`;
+                return typeMap[segment.segment_type] || segment.display_name || segment.segment_type;
+            }
+            
+            seekToSegment(index) {
+                if (index >= 0 && index < this.mediaQueue.length) {
+                    this.log('info', `Seeking to segment ${index + 1}: ${this.mediaQueue[index].display_name}`);
+                    
+                    // Stop current playback
+                    if (this.segmentTimer) {
+                        clearTimeout(this.segmentTimer);
+                        this.segmentTimer = null;
+                    }
+                    
+                    // Set new segment index
+                    this.currentSegmentIndex = index;
+                    
+                    // If playing, start the new segment immediately
+                    if (this.isPlaying) {
+                        this.playCurrentSegment();
+                    } else {
+                        // Just highlight the segment
+                        this.highlightCurrentSegment();
+                    }
                 }
-                return `${forcedPrefix}📄 ${item.media_type}`;
             }
             
             async play() {
-                this.log('info', 'Starting playback...');
+                this.log('info', 'Starting sequential segment playback...');
                 
                 try {
                     this.isLoading = true;
@@ -898,67 +918,25 @@
                     this.pauseBtn.disabled = false;
                     this.stopBtn.disabled = false;
                     
-                    // Ensure main audio is ready
-                    if (this.mainAudio.readyState < 3) {
-                        this.log('info', 'Waiting for main audio to be ready...');
-                        await new Promise((resolve) => {
-                            const onReady = () => {
-                                this.mainAudio.removeEventListener('canplaythrough', onReady);
-                                resolve();
-                            };
-                            this.mainAudio.addEventListener('canplaythrough', onReady);
-                        });
-                    }
-                    
-                    // Ensure background audio is ready if available
-                    if (this.backgroundAudio.src && this.backgroundAudio.readyState < 3) {
-                        this.log('info', 'Waiting for background audio to be ready...');
-                        await new Promise((resolve) => {
-                            const onReady = () => {
-                                this.backgroundAudio.removeEventListener('canplaythrough', onReady);
-                                resolve();
-                            };
-                            this.backgroundAudio.addEventListener('canplaythrough', onReady);
-                        });
-                    }
-                    
                     this.isPlaying = true;
                     this.isLoading = false;
-                    this.syncCounter = 0; // Reset sync counter
                     
-                    // Handle resuming from pause
-                    if (this.pauseStartTime && this.pausedTime !== undefined) {
-                        // We're resuming from a pause
-                        this.pausedDuration += (performance.now() - this.pauseStartTime);
-                        this.currentTime = this.pausedTime;
-                        this.pauseStartTime = null;
-                        this.log('info', `Resuming playback from ${this.formatTime(this.currentTime)}`);
-                    } else {
-                        // Starting fresh
-                        this.currentTime = 0;
-                        this.playbackStartTime = null; // Will be set in startMediaSync
-                        this.pausedDuration = 0;
-                        
-                        // Clear any active media from previous playback
-                        this.activeMedia.clear();
-                        this.log('info', 'Starting fresh playback');
+                    // Start from current segment or first segment
+                    if (this.currentSegmentIndex >= this.mediaQueue.length) {
+                        this.currentSegmentIndex = 0;
                     }
                     
-                    // DO NOT start main audio immediately - let the media sync system handle it
-                    // based on the manifest timing (it should start at intro_duration, not at 0)
-                    this.log('info', 'Playback initialized - media sync will handle audio timing');
+                    this.log('info', `Starting from segment ${this.currentSegmentIndex + 1}/${this.mediaQueue.length}`);
                     
-                    // Handle background music based on current time
+                    // Start background music if available
                     if (this.backgroundAudio.src) {
-                        this.backgroundAudio.currentTime = this.currentTime;
+                        this.backgroundAudio.volume = 0.15; // Low background volume
                         await this.backgroundAudio.play();
-                        this.log('info', `Background music started at ${this.formatTime(this.currentTime)}`);
+                        this.log('info', 'Background music started');
                     }
                     
-                    // Start the media synchronization loop - this will handle all media timing
-                    this.startMediaSync();
-                    
-                    this.log('info', 'Playback started successfully - media sync controlling all timing');
+                    // Start playing the current segment
+                    await this.playCurrentSegment();
                     
                 } catch (error) {
                     this.log('error', `Playback failed: ${error.message}`);
@@ -970,75 +948,188 @@
                 }
             }
             
+            async playCurrentSegment() {
+                if (!this.isPlaying) return;
+                
+                const segment = this.mediaQueue[this.currentSegmentIndex];
+                if (!segment) {
+                    this.log('info', 'All segments completed - ending playback');
+                    this.stop();
+                    return;
+                }
+                
+                this.log('info', `Playing segment ${this.currentSegmentIndex + 1}/${this.mediaQueue.length}: ${segment.display_name}`);
+                
+                // Update playlist highlight
+                this.highlightCurrentSegment();
+                
+                // Update media info display
+                this.updateMediaInfo(segment);
+                
+                // Play audio for this segment
+                await this.playSegmentAudio(segment);
+                
+                // Show video for this segment
+                await this.showSegmentVideo(segment);
+                
+                // Set up automatic progression to next segment
+                this.setupSegmentTransition(segment);
+            }
+            
+            async playSegmentAudio(segment) {
+                try {
+                    this.mainAudio.src = segment.audio_path;
+                    this.mainAudio.currentTime = 0;
+                    
+                    // Wait for audio to be ready
+                    await new Promise((resolve, reject) => {
+                        const onReady = () => {
+                            this.mainAudio.removeEventListener('canplaythrough', onReady);
+                            this.mainAudio.removeEventListener('error', onError);
+                            resolve();
+                        };
+                        const onError = () => {
+                            this.mainAudio.removeEventListener('canplaythrough', onReady);
+                            this.mainAudio.removeEventListener('error', onError);
+                            reject(new Error('Audio failed to load'));
+                        };
+                        
+                        if (this.mainAudio.readyState >= 3) {
+                            resolve();
+                        } else {
+                            this.mainAudio.addEventListener('canplaythrough', onReady);
+                            this.mainAudio.addEventListener('error', onError);
+                        }
+                    });
+                    
+                    await this.mainAudio.play();
+                    this.log('info', `Audio playing: ${segment.audio_file}`);
+                    
+                } catch (error) {
+                    this.log('error', `Failed to play audio for ${segment.display_name}: ${error.message}`);
+                }
+            }
+            
+            async showSegmentVideo(segment) {
+                try {
+                    if (segment.video_path) {
+                        this.mainVideo.src = segment.video_path;
+                        this.mainVideo.currentTime = 0;
+                        
+                        // Wait for video to be ready
+                        await new Promise((resolve) => {
+                            const onReady = () => {
+                                this.mainVideo.removeEventListener('canplay', onReady);
+                                resolve();
+                            };
+                            
+                            if (this.mainVideo.readyState >= 3) {
+                                resolve();
+                            } else {
+                                this.mainVideo.addEventListener('canplay', onReady);
+                            }
+                        });
+                        
+                        await this.mainVideo.play();
+                        this.log('info', `Video playing: ${segment.video_path}`);
+                    } else {
+                        this.log('info', `No video for segment: ${segment.display_name}`);
+                        // Clear video if no video for this segment
+                        this.mainVideo.src = '';
+                    }
+                    
+                } catch (error) {
+                    this.log('warning', `Failed to play video for ${segment.display_name}: ${error.message}`);
+                }
+            }
+            
+            setupSegmentTransition(segment) {
+                // Set up transition to next segment based on audio duration
+                this.segmentTimer = setTimeout(() => {
+                    if (this.isPlaying) {
+                        this.currentSegmentIndex++;
+                        this.playCurrentSegment();
+                    }
+                }, segment.duration * 1000); // Convert to milliseconds
+                
+                this.log('info', `Next segment in ${segment.duration.toFixed(1)} seconds`);
+            }
+            
+            highlightCurrentSegment() {
+                // Clear all highlights
+                this.clearActivePlaylistItems();
+                
+                // Highlight current segment
+                const playlistItem = this.playlistContainer.querySelector(`[data-index="${this.currentSegmentIndex}"]`);
+                if (playlistItem) {
+                    playlistItem.classList.add('playing');
+                    
+                    // Auto-scroll to current segment
+                    playlistItem.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'nearest' 
+                    });
+                }
+            }
+            
             pause() {
-                this.log('info', 'Pausing playback...');
+                this.log('info', 'Pausing segment playback...');
                 
                 this.isPlaying = false;
                 this.playBtn.disabled = false;
                 this.pauseBtn.disabled = true;
                 
-                // Record pause time for timeline calculation
-                if (this.playbackStartTime) {
-                    const elapsedMs = performance.now() - this.playbackStartTime - this.pausedDuration;
-                    this.pausedTime = elapsedMs / 1000;
-                    this.pauseStartTime = performance.now();
+                // Clear any pending segment transitions
+                if (this.segmentTimer) {
+                    clearTimeout(this.segmentTimer);
+                    this.segmentTimer = null;
                 }
                 
-                // Pause all audio
+                // Pause all audio/video
                 this.mainAudio.pause();
                 this.backgroundAudio.pause();
-                this.segmentAudio.pause();
-                
-                // Pause all video
                 this.mainVideo.pause();
                 
-                this.log('info', 'Playback paused');
+                this.log('info', 'Segment playback paused');
             }
             
             stop() {
-                this.log('info', 'Stopping playback...');
+                this.log('info', 'Stopping segment playback...');
                 
                 this.isPlaying = false;
-                this.currentTime = 0;
-                this.activeMedia.clear();
+                this.currentSegmentIndex = 0;
                 
-                // Reset timeline tracking
-                this.playbackStartTime = null;
-                this.pausedDuration = 0;
-                this.pausedTime = 0;
-                this.pauseStartTime = null;
+                // Clear any pending segment transitions
+                if (this.segmentTimer) {
+                    clearTimeout(this.segmentTimer);
+                    this.segmentTimer = null;
+                }
                 
-                // Reset background fade state
-                this.backgroundFadeStarted = false;
-                this.backgroundFadeStartTime = null;
-                
-                // Restore background music to 100%
-                this.backgroundVolume.value = 100;
-                this.updateVolume('background', 100);
-                document.getElementById('backgroundVolumeValue').textContent = '100%';
-                
-                // Stop and reset all audio
+                // Stop and reset all audio/video
                 this.mainAudio.pause();
                 this.mainAudio.currentTime = 0;
+                this.mainAudio.src = '';
+                
                 this.backgroundAudio.pause();
                 this.backgroundAudio.currentTime = 0;
-                this.segmentAudio.pause();
-                this.segmentAudio.currentTime = 0;
                 
-                // Stop and reset main video
                 this.mainVideo.pause();
                 this.mainVideo.currentTime = 0;
-                this.mainVideo.src = ''; // Clear video source
+                this.mainVideo.src = '';
                 
                 // Reset UI
                 this.playBtn.disabled = false;
                 this.pauseBtn.disabled = true;
                 this.stopBtn.disabled = true;
                 
-                this.updateTimeline();
+                // Clear playlist highlighting
                 this.clearActivePlaylistItems();
                 
-                this.log('info', 'Playback stopped and background music restored to 100%');
+                // Hide media info
+                const mediaInfo = document.getElementById('mediaInfo');
+                mediaInfo.style.display = 'none';
+                
+                this.log('info', 'Segment playback stopped and reset');
             }
             
             async reload() {
@@ -1420,13 +1511,13 @@
                 });
             }
             
-            updateMediaInfo(item) {
+            updateMediaInfo(segment) {
                 const mediaInfo = document.getElementById('mediaInfo');
                 
-                if (item) {
-                    document.getElementById('mediaTitle').textContent = this.getMediaDisplayName(item);
-                    document.getElementById('mediaDescription').textContent = item.description || 'No description available';
-                    document.getElementById('mediaTime').textContent = `${this.formatTime(item.start_time)} - ${this.formatTime(item.end_time)}`;
+                if (segment) {
+                    document.getElementById('mediaTitle').textContent = this.getSegmentDisplayName(segment);
+                    document.getElementById('mediaDescription').textContent = segment.headline || 'No description available';
+                    document.getElementById('mediaTime').textContent = `${this.formatTime(segment.duration)} duration`;
                     mediaInfo.style.display = 'block';
                 } else {
                     mediaInfo.style.display = 'none';
@@ -1475,20 +1566,6 @@
                 
                 this.updateTimeline();
                 this.log('info', `Seeked to ${this.formatTime(this.currentTime)}`);
-            }
-            
-            seekToMediaItem(index) {
-                const item = this.mediaQueue[index];
-                if (item) {
-                    this.seekToTime(item.start_time);
-                    
-                    // Highlight the selected item
-                    this.clearActivePlaylistItems();
-                    const playlistItem = this.playlistContainer.querySelector(`[data-index="${index}"]`);
-                    if (playlistItem) {
-                        playlistItem.classList.add('active');
-                    }
-                }
             }
             
             updateVolume(type, value) {
