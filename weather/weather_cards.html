@@ -1,0 +1,3479 @@
+<!--
+    Weather Card Display System
+    
+    PURPOSE:
+    This HTML page displays individual weather cards for video recording and composition.
+    Each card shows a specific weather metric with professional styling and animations.
+    
+    USAGE:
+    Open this file in a browser and use URL parameters to display different cards.
+    Navigate between cards using:
+    - Click left/right sides of the card
+    - Use keyboard arrow keys (← →)
+    - URL parameters for direct access
+    
+    DATA INTEGRATION:
+    - Automatically loads real weather data from scraped JSON files
+    - Use ?data=filename.json to specify a custom weather data file
+    - Falls back to sample data if real data is unavailable
+    - Integrates enhanced hourly data from MSN weather tabs
+    
+    Available Cards:
+    - weather_cards.html?card=current         (Current weather overview)
+    This visual presents the current weather conditions overview. It shows the current temperature, weather condition, feels like temperature, and key weather metrics including wind, humidity, visibility, pressure, and dew point in a comprehensive dashboard format.
+
+    - weather_cards.html?card=temperature     (Current temperature with trends)     
+    This visual presents temperature data for the day. It shows the current temperature, how hot it feels, the highest and lowest expected temperatures, and the time when the peak temperature will occur. It also includes a timeline graph of temperature changes throughout the day.
+
+    - weather_cards.html?card=feels-like     (Heat index and humidity factor)       
+    This visual presents the "feels like" temperature, explaining how it differs from the actual temperature due to factors such as humidity. It highlights the influence of environmental conditions on how hot or cold the weather feels to a person.
+
+    - weather_cards.html?card=cloud-cover    (Cloud conditions and forecast)        
+    This visual presents information about cloud cover. It describes the current sky condition and indicates whether cloudiness is increasing or decreasing, helping to understand how clear or overcast the sky is expected to be.
+
+    - weather_cards.html?card=precipitation  (Rain/snow data and predictions)       
+    This visual presents precipitation data. It shows the total expected rainfall over the next 24 hours, provides a timeline of projected precipitation levels by hour, and indicates whether any rainfall is currently expected.
+
+    - weather_cards.html?card=wind           
+    (Wind speed, direction, and gusts)     This visual presents wind data. It shows the current wind speed and direction, the strongest wind gust expected, and a forecast of wind speeds over time. It also includes the wind's origin angle and its strength based on the Beaufort scale.
+
+    - weather_cards.html?card=humidity       (Relative humidity with dew point)
+    This visual presents humidity data. It shows the current humidity level, the dew point temperature, and how humidity is expected to change over time. It also includes a general description of the humidity condition.
+
+    - weather_cards.html?card=uv             (UV index with safety levels)
+    This visual presents ultraviolet (UV) index data. It shows the current UV level, its risk classification, and a timeline of how the UV index is expected to vary throughout the day.
+
+    - weather_cards.html?card=aqi            (Air quality index and pollutants)
+    This visual presents air quality data. It shows the Air Quality Index (AQI) level, the status of air quality, the main pollutant contributing to the reading, and a short explanation of current pollution conditions.
+
+    - weather_cards.html?card=visibility     (Visibility distance and conditions)
+    This visual presents visibility data. It shows the current visibility distance, a general assessment of its quality, and a timeline of how visibility is expected to change throughout the day.
+
+    - weather_cards.html?card=pressure       (Atmospheric pressure and trends)
+    This visual presents atmospheric pressure data. It shows the current pressure reading, the time of observation, the trend over the next several hours, and whether the pressure is rising or falling.
+
+    - weather_cards.html?card=sun            (Sunrise/sunset times and duration)
+    This visual presents sun-related data. It shows the time of sunrise and sunset, as well as the total duration of daylight for the day.
+
+    - weather_cards.html?card=moon           (Moon phase and illumination)
+    This visual presents moon phase data. It shows the current moon phase, the percentage of moon illumination, and the expected date of the next full moon.
+    
+    - weather_cards.html?card=hourly         (Hourly forecast with 6-day tabs)
+    This visual presents a comprehensive hourly weather forecast in a dashboard format. It features a 6-day tab navigation system, showing hourly temperature data, weather conditions, rain probability percentages, an animated temperature curve chart, and sunrise/sunset times. The layout is designed for wider displays (1000px) and includes interactive toggle switches and animated weather elements.
+    
+    
+    FEATURES:
+    - Professional glassmorphism design with backdrop blur
+    - Smooth animations and transitions
+    - Responsive 500x600px cards perfect for video recording
+    - Inter font for clean typography
+    - Color-coded indicators and progress bars
+    - Real-time visual effects (glowing, pulsing, floating)
+    - Interactive Chart.js charts for data visualization
+    - Hourly forecasts and trends for key metrics
+    - Click navigation (left/right sides of card)
+    - Keyboard navigation (arrow keys)
+    - Card counter showing current position (1/13)
+    
+    CARD CLASS SYSTEM:
+    Each card automatically gets a specific CSS class applied:
+    - .current-card     - Current weather overview (600x750px)
+    - .temperature-card - Temperature data with gradient text
+    - .feels-like-card  - Feels like temperature with gradient text
+    - .cloud-cover-card - Cloud conditions with enhanced icons
+    - .precipitation-card - Rain/snow data with blue glow effects
+    - .wind-card        - Wind data with enhanced direction display (620px height)
+    - .humidity-card    - Humidity with enhanced circular progress
+    - .uv-card          - UV index with enhanced circular progress
+    - .aqi-card         - Air quality with enhanced indicator
+    - .visibility-card  - Visibility with gray glow effects
+    - .pressure-card    - Pressure with purple glow effects
+    - .sun-card         - Sun data with enhanced arc visualization (650px height)
+    - .moon-card        - Moon phases with enhanced visual effects (520px width)
+    
+    This allows for card-specific styling overrides and custom sizing.
+    
+    RECORDING SETUP:
+    Each card is designed to be recorded individually for video composition.
+    The cards maintain consistent sizing and styling across all types.
+    
+    DATA SOURCE:
+    Weather data is forged/enhanced from actual JSON weather data with
+    additional calculated metrics for comprehensive weather reporting.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Card Display</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            margin: 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Animated Gradient Background System */
+        .gradient-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            transition: all 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .gradients-container {
+            filter: blur(30px);
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .gradient-orb {
+            position: absolute;
+            border-radius: 50%;
+            mix-blend-mode: multiply;
+            transition: all 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+            animation-timing-function: ease-in-out;
+        }
+
+        .gradient-orb:nth-child(odd) {
+            animation-duration: 25s;
+        }
+
+        .gradient-orb:nth-child(even) {
+            animation-duration: 35s;
+        }
+
+        .orb1 {
+            width: 80%;
+            height: 80%;
+            top: 10%;
+            left: 10%;
+            animation: moveVertical 30s ease infinite;
+        }
+
+        .orb2 {
+            width: 70%;
+            height: 70%;
+            top: 15%;
+            left: 15%;
+            animation: moveInCircle 25s reverse infinite;
+        }
+
+        .orb3 {
+            width: 60%;
+            height: 60%;
+            top: 20%;
+            left: 20%;
+            animation: moveHorizontal 35s ease infinite;
+        }
+
+        .orb4 {
+            width: 90%;
+            height: 90%;
+            top: 5%;
+            left: 5%;
+            animation: moveInCircle 40s linear infinite;
+        }
+
+        .orb5 {
+            width: 50%;
+            height: 50%;
+            top: 25%;
+            left: 25%;
+            animation: moveVertical 20s ease infinite reverse;
+        }
+
+        @keyframes moveInCircle {
+            0% { transform: rotate(0deg) translateX(100px) rotate(0deg); }
+            100% { transform: rotate(360deg) translateX(100px) rotate(-360deg); }
+        }
+
+        @keyframes moveVertical {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-100px); }
+        }
+
+        @keyframes moveHorizontal {
+            0%, 100% { transform: translateX(0px); }
+            50% { transform: translateX(200px); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { 
+                transform: scale(1);
+                opacity: 0.8;
+            }
+            50% { 
+                transform: scale(1.2);
+                opacity: 1;
+            }
+        }
+
+        /* Card-specific gradient themes */
+        .gradient-bg.current {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #667eea 100%);
+        }
+        .current .orb1 { background: radial-gradient(circle, rgba(102, 126, 234, 0.8), transparent 70%); }
+        .current .orb2 { background: radial-gradient(circle, rgba(118, 75, 162, 0.6), transparent 70%); }
+        .current .orb3 { background: radial-gradient(circle, rgba(102, 126, 234, 0.7), transparent 70%); }
+        .current .orb4 { background: radial-gradient(circle, rgba(118, 75, 162, 0.5), transparent 70%); }
+        .current .orb5 { background: radial-gradient(circle, rgba(139, 92, 246, 0.6), transparent 70%); }
+
+        .gradient-bg.temperature {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 50%, #ff4757 100%);
+        }
+        .temperature .orb1 { background: radial-gradient(circle, rgba(255, 107, 107, 0.8), transparent 70%); }
+        .temperature .orb2 { background: radial-gradient(circle, rgba(255, 165, 0, 0.6), transparent 70%); }
+        .temperature .orb3 { background: radial-gradient(circle, rgba(255, 71, 87, 0.7), transparent 70%); }
+        .temperature .orb4 { background: radial-gradient(circle, rgba(255, 140, 0, 0.5), transparent 70%); }
+        .temperature .orb5 { background: radial-gradient(circle, rgba(255, 99, 99, 0.6), transparent 70%); }
+
+        .gradient-bg.feels-like {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%);
+        }
+        .feels-like .orb1 { background: radial-gradient(circle, rgba(255, 154, 158, 0.8), transparent 70%); }
+        .feels-like .orb2 { background: radial-gradient(circle, rgba(254, 207, 239, 0.6), transparent 70%); }
+        .feels-like .orb3 { background: radial-gradient(circle, rgba(255, 182, 193, 0.7), transparent 70%); }
+        .feels-like .orb4 { background: radial-gradient(circle, rgba(255, 192, 203, 0.5), transparent 70%); }
+        .feels-like .orb5 { background: radial-gradient(circle, rgba(255, 160, 180, 0.6), transparent 70%); }
+
+        .gradient-bg.cloud-cover {
+            background: linear-gradient(135deg, #74b9ff 0%, #0984e3 50%, #6c5ce7 100%);
+        }
+        .cloud-cover .orb1 { background: radial-gradient(circle, rgba(116, 185, 255, 0.8), transparent 70%); }
+        .cloud-cover .orb2 { background: radial-gradient(circle, rgba(9, 132, 227, 0.6), transparent 70%); }
+        .cloud-cover .orb3 { background: radial-gradient(circle, rgba(108, 92, 231, 0.7), transparent 70%); }
+        .cloud-cover .orb4 { background: radial-gradient(circle, rgba(116, 185, 255, 0.5), transparent 70%); }
+        .cloud-cover .orb5 { background: radial-gradient(circle, rgba(99, 110, 250, 0.6), transparent 70%); }
+
+        .gradient-bg.precipitation {
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 50%, #1e3a8a 100%);
+        }
+        .precipitation .orb1 { background: radial-gradient(circle, rgba(59, 130, 246, 0.8), transparent 70%); }
+        .precipitation .orb2 { background: radial-gradient(circle, rgba(30, 64, 175, 0.6), transparent 70%); }
+        .precipitation .orb3 { background: radial-gradient(circle, rgba(30, 58, 138, 0.7), transparent 70%); }
+        .precipitation .orb4 { background: radial-gradient(circle, rgba(37, 99, 235, 0.5), transparent 70%); }
+        .precipitation .orb5 { background: radial-gradient(circle, rgba(29, 78, 216, 0.6), transparent 70%); }
+
+        .gradient-bg.wind {
+            background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%);
+        }
+        .wind .orb1 { background: radial-gradient(circle, rgba(16, 185, 129, 0.8), transparent 70%); }
+        .wind .orb2 { background: radial-gradient(circle, rgba(5, 150, 105, 0.6), transparent 70%); }
+        .wind .orb3 { background: radial-gradient(circle, rgba(4, 120, 87, 0.7), transparent 70%); }
+        .wind .orb4 { background: radial-gradient(circle, rgba(6, 182, 212, 0.5), transparent 70%); }
+        .wind .orb5 { background: radial-gradient(circle, rgba(14, 165, 233, 0.6), transparent 70%); }
+
+        .gradient-bg.humidity {
+            background: linear-gradient(135deg, #06b6d4 0%, #0891b2 50%, #0e7490 100%);
+        }
+        .humidity .orb1 { background: radial-gradient(circle, rgba(6, 182, 212, 0.8), transparent 70%); }
+        .humidity .orb2 { background: radial-gradient(circle, rgba(8, 145, 178, 0.6), transparent 70%); }
+        .humidity .orb3 { background: radial-gradient(circle, rgba(14, 116, 144, 0.7), transparent 70%); }
+        .humidity .orb4 { background: radial-gradient(circle, rgba(34, 197, 94, 0.5), transparent 70%); }
+        .humidity .orb5 { background: radial-gradient(circle, rgba(59, 130, 246, 0.6), transparent 70%); }
+
+        .gradient-bg.uv {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%);
+        }
+        .uv .orb1 { background: radial-gradient(circle, rgba(245, 158, 11, 0.8), transparent 70%); }
+        .uv .orb2 { background: radial-gradient(circle, rgba(217, 119, 6, 0.6), transparent 70%); }
+        .uv .orb3 { background: radial-gradient(circle, rgba(180, 83, 9, 0.7), transparent 70%); }
+        .uv .orb4 { background: radial-gradient(circle, rgba(251, 191, 36, 0.5), transparent 70%); }
+        .uv .orb5 { background: radial-gradient(circle, rgba(255, 193, 7, 0.6), transparent 70%); }
+
+        .gradient-bg.aqi {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 50%, #6d28d9 100%);
+        }
+        .aqi .orb1 { background: radial-gradient(circle, rgba(139, 92, 246, 0.8), transparent 70%); }
+        .aqi .orb2 { background: radial-gradient(circle, rgba(124, 58, 237, 0.6), transparent 70%); }
+        .aqi .orb3 { background: radial-gradient(circle, rgba(109, 40, 217, 0.7), transparent 70%); }
+        .aqi .orb4 { background: radial-gradient(circle, rgba(147, 51, 234, 0.5), transparent 70%); }
+        .aqi .orb5 { background: radial-gradient(circle, rgba(168, 85, 247, 0.6), transparent 70%); }
+
+        .gradient-bg.visibility {
+            background: linear-gradient(135deg, #64748b 0%, #475569 50%, #334155 100%);
+        }
+        .visibility .orb1 { background: radial-gradient(circle, rgba(100, 116, 139, 0.8), transparent 70%); }
+        .visibility .orb2 { background: radial-gradient(circle, rgba(71, 85, 105, 0.6), transparent 70%); }
+        .visibility .orb3 { background: radial-gradient(circle, rgba(51, 65, 85, 0.7), transparent 70%); }
+        .visibility .orb4 { background: radial-gradient(circle, rgba(148, 163, 184, 0.5), transparent 70%); }
+        .visibility .orb5 { background: radial-gradient(circle, rgba(203, 213, 225, 0.6), transparent 70%); }
+
+        .gradient-bg.pressure {
+            background: linear-gradient(135deg, #ec4899 0%, #db2777 50%, #be185d 100%);
+        }
+        .pressure .orb1 { background: radial-gradient(circle, rgba(236, 72, 153, 0.8), transparent 70%); }
+        .pressure .orb2 { background: radial-gradient(circle, rgba(219, 39, 119, 0.6), transparent 70%); }
+        .pressure .orb3 { background: radial-gradient(circle, rgba(190, 24, 93, 0.7), transparent 70%); }
+        .pressure .orb4 { background: radial-gradient(circle, rgba(244, 114, 182, 0.5), transparent 70%); }
+        .pressure .orb5 { background: radial-gradient(circle, rgba(251, 146, 60, 0.6), transparent 70%); }
+
+        .gradient-bg.sun {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+        }
+        .sun .orb1 { background: radial-gradient(circle, rgba(251, 191, 36, 0.8), transparent 70%); }
+        .sun .orb2 { background: radial-gradient(circle, rgba(245, 158, 11, 0.6), transparent 70%); }
+        .sun .orb3 { background: radial-gradient(circle, rgba(217, 119, 6, 0.7), transparent 70%); }
+        .sun .orb4 { background: radial-gradient(circle, rgba(255, 193, 7, 0.5), transparent 70%); }
+        .sun .orb5 { background: radial-gradient(circle, rgba(255, 165, 0, 0.6), transparent 70%); }
+
+        .gradient-bg.moon {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #020617 100%);
+        }
+        .moon .orb1 { background: radial-gradient(circle, rgba(30, 41, 59, 0.8), transparent 70%); }
+        .moon .orb2 { background: radial-gradient(circle, rgba(15, 23, 42, 0.6), transparent 70%); }
+        .moon .orb3 { background: radial-gradient(circle, rgba(2, 6, 23, 0.7), transparent 70%); }
+        .moon .orb4 { background: radial-gradient(circle, rgba(71, 85, 105, 0.5), transparent 70%); }
+        .moon .orb5 { background: radial-gradient(circle, rgba(100, 116, 139, 0.6), transparent 70%); }
+
+        .card {
+            background: rgba(0, 0, 0, 0.55);
+            -webkit-backdrop-filter: blur(25px);
+            backdrop-filter: blur(25px);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 25px;
+            padding: 40px;
+            width: 500px;
+            height: 600px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+            animation: cardAppear 0.8s ease-out;
+            box-shadow: 
+                0 20px 40px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            z-index: 10;
+        }
+
+        /* Current weather card specific sizing */
+        .current-card {
+            width: min(600px, 90vw);
+            height: auto;
+            min-height: 600px;
+            max-height: 95vh;
+            padding: 45px;
+            overflow-y: auto;
+        }
+
+        /* Responsive adjustments for current card */
+        @media (max-width: 768px) {
+            .current-card {
+                width: 95vw;
+                padding: 30px 25px;
+                min-height: 500px;
+            }
+            
+            .current-card .card-main-value {
+                font-size: 64px;
+            }
+            
+            .current-card .weather-metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+            }
+            
+            .current-card .card-title {
+                font-size: 28px;
+            }
+            
+            .current-card .current-condition {
+                font-size: 24px;
+            }
+            
+            .current-card .current-description {
+                font-size: 16px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .current-card {
+                width: 98vw;
+                padding: 25px 20px;
+                min-height: 450px;
+            }
+            
+            .current-card .card-main-value {
+                font-size: 56px;
+            }
+            
+            .current-card .weather-metrics-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            
+            .current-card .metric-item {
+                padding: 15px 12px;
+            }
+            
+            .current-card .card-title {
+                font-size: 24px;
+            }
+            
+            .current-card .feels-like-display {
+                padding: 15px;
+            }
+        }
+
+        @media (max-height: 800px) {
+            .current-card {
+                max-height: 90vh;
+                padding: 35px;
+            }
+            
+            .current-card .card-main-value {
+                font-size: 64px;
+                margin: 20px 0 15px 0;
+            }
+            
+            .current-card .current-weather-icon {
+                width: 80px;
+                height: 80px;
+                font-size: 40px;
+                margin: 15px auto;
+            }
+            
+            .current-card .weather-metrics-grid {
+                margin: 20px 0;
+            }
+        }
+
+        /* Enhanced responsive grid for current card */
+        .current-card .weather-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 18px;
+            margin: 30px 0;
+        }
+        
+        /* Flexible current weather layout */
+        .current-card .card-content-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            justify-content: space-between;
+        }
+
+        /* Sun card specific sizing - slightly taller for the arc visualization */
+        .sun-card {
+            height: 650px;
+            padding: 35px;
+        }
+
+        /* Moon card specific styling - slightly wider for the visual elements */
+        .moon-card {
+            width: 520px;
+            background: rgba(0, 0, 0, 0.7);
+        }
+
+        /* Wind card specific sizing - accommodate the direction display */
+        .wind-card {
+            height: 620px;
+        }
+
+        /* Ensure all text elements are white */
+        .card * {
+            color: white !important;
+        }
+
+        /* Override any specific text colors */
+        .card-title,
+        .card-main-value,
+        .card-subtitle,
+        .detail-label,
+        .detail-value,
+        .circular-value,
+        .sun-time-value,
+        .sun-time-label,
+        .moon-phase-value,
+        .moon-phase-name,
+        .trend-indicator span,
+        canvas,
+        text,
+        svg text {
+            color: white !important;
+        }
+
+        /* Additional comprehensive text color overrides */
+        .card p,
+        .card span,
+        .card div,
+        .card h1,
+        .card h2,
+        .card h3,
+        .card h4,
+        .card h5,
+        .card h6,
+        .card label,
+        .card strong,
+        .card em,
+        .card small {
+            color: white !important;
+        }
+
+        /* Ensure inline styles don't override white text */
+        .card [style*="color"] {
+            color: white !important;
+        }
+
+        /* Chart.js specific text color overrides */
+        .chart-canvas,
+        .chart-canvas * {
+            color: white !important;
+        }
+
+        /* Force Chart.js text elements to be white */
+        canvas {
+            color: white !important;
+        }
+
+        @keyframes cardAppear {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+        }
+
+        .card-title {
+            font-size: 32px;
+            font-weight: 600;
+            opacity: 0.9;
+        }
+
+        .card-main-value {
+            font-size: 84px;
+            font-weight: 700;
+            line-height: 1;
+            margin: 25px 0;
+            animation: valueGlow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes valueGlow {
+            from {
+                text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+            }
+            to {
+                text-shadow: 0 0 30px rgba(255, 255, 255, 0.6);
+            }
+        }
+
+        .card-subtitle {
+            font-size: 22px;
+            opacity: 0.7;
+            margin-bottom: 25px;
+        }
+
+        .card-details {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .detail-label {
+            font-size: 20px;
+            opacity: 0.8;
+        }
+
+        .detail-value {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ade80, #22c55e);
+            border-radius: 4px;
+            animation: progressFill 1.5s ease-out;
+        }
+
+        @keyframes progressFill {
+            from {
+                width: 0%;
+            }
+        }
+
+        .circular-progress {
+            width: 140px;
+            height: 140px;
+            margin: 25px auto;
+            position: relative;
+        }
+
+        .circular-progress svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .circular-progress circle {
+            fill: none;
+            stroke-width: 10;
+        }
+
+        .circular-progress .bg-circle {
+            stroke: rgba(255, 255, 255, 0.2);
+        }
+
+        .circular-progress .progress-circle {
+            stroke: #4ade80;
+            stroke-linecap: round;
+            stroke-dasharray: 377;
+            animation: circularFill 2s ease-out;
+        }
+
+        @keyframes circularFill {
+            from {
+                stroke-dashoffset: 377;
+            }
+        }
+
+        .circular-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 36px;
+            font-weight: 700;
+        }
+
+        .wind-direction {
+            width: 100px;
+            height: 100px;
+            margin: 25px auto;
+            position: relative;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .wind-arrow {
+            width: 50px;
+            height: 50px;
+            background: white;
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            animation: windRotate 3s ease-in-out infinite;
+        }
+
+        @keyframes windRotate {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(15deg); }
+        }
+
+        .sun-moon-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 25px 0;
+        }
+
+        .sun-moon-item {
+            text-align: center;
+            flex: 1;
+        }
+
+        .sun-moon-icon {
+            width: 50px;
+            height: 50px;
+            margin: 0 auto 10px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .sun-icon {
+            background: linear-gradient(45deg, #fbbf24, #f59e0b);
+        }
+
+        .moon-icon {
+            background: linear-gradient(45deg, #64748b, #475569);
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .weather-icon-large {
+            width: 120px;
+            height: 120px;
+            margin: 25px auto;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 56px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .trend-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 12px;
+            font-size: 20px;
+        }
+
+        .trend-arrow {
+            width: 0;
+            height: 0;
+            border-left: 7px solid transparent;
+            border-right: 7px solid transparent;
+        }
+
+        .trend-up {
+            border-bottom: 12px solid #22c55e;
+        }
+
+        .trend-down {
+            border-top: 12px solid #ef4444;
+        }
+
+        .trend-stable {
+            width: 14px;
+            height: 2px;
+            background: #64748b;
+        }
+
+        .aqi-indicator {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            margin: 25px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: 700;
+            animation: aqiPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes aqiPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4); }
+            50% { box-shadow: 0 0 0 20px rgba(255, 255, 255, 0); }
+        }
+
+        .good { background: #22c55e; }
+        .moderate { background: #eab308; }
+        .unhealthy { background: #ef4444; }
+
+        .moon-phase {
+            width: 100px;
+            height: 100px;
+            margin: 25px auto;
+            border-radius: 50%;
+            background: #64748b;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .moon-shadow {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 50%;
+            height: 100%;
+            background: #1e293b;
+            border-radius: 0 50px 50px 0;
+            animation: moonPhase 4s ease-in-out infinite;
+        }
+
+        @keyframes moonPhase {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(-100%); }
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 120px;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        .mini-chart-container {
+            width: 100%;
+            height: 80px;
+            margin: 15px 0;
+            position: relative;
+        }
+
+        .chart-canvas {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        .navigation-area {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 50%;
+            z-index: 10;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .nav-left {
+            left: 0;
+        }
+
+        .nav-right {
+            right: 0;
+        }
+
+        .navigation-area:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .nav-indicator {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .nav-left .nav-indicator {
+            left: 20px;
+        }
+
+        .nav-right .nav-indicator {
+            right: 20px;
+        }
+
+        .navigation-area:hover .nav-indicator {
+            opacity: 1;
+        }
+
+        .card-counter {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 12px;
+            border-radius: 15px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 5;
+            opacity: .1;
+            color: white;
+            font-size: 10px;
+        }
+
+        /* Beautiful Sun Card Styles */
+        .sun-arc-container {
+            display: flex;
+            justify-content: center;
+            margin: 25px 0;
+        }
+
+        .sun-arc {
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .sun-times-display {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin: 30px 0;
+            padding: 0 20px;
+        }
+
+        .sun-time-item {
+            text-align: center;
+            flex: 1;
+        }
+
+        .sun-time-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 15px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sunrise-icon {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FFE66D 50%, #FF6B6B 100%);
+            animation: sunriseGlow 3s ease-in-out infinite;
+        }
+
+        .sunset-icon {
+            background: linear-gradient(135deg, #FF8E53 0%, #FF6B6B 50%, #B06AB3 100%);
+            animation: sunsetGlow 3s ease-in-out infinite;
+        }
+
+        @keyframes sunriseGlow {
+            0%, 100% { 
+                box-shadow: 0 0 20px rgba(255, 107, 107, 0.4);
+                transform: scale(1);
+            }
+            50% { 
+                box-shadow: 0 0 30px rgba(255, 230, 109, 0.6);
+                transform: scale(1.05);
+            }
+        }
+
+        @keyframes sunsetGlow {
+            0%, 100% { 
+                box-shadow: 0 0 20px rgba(255, 142, 83, 0.4);
+                transform: scale(1);
+            }
+            50% { 
+                box-shadow: 0 0 30px rgba(255, 107, 107, 0.6);
+                transform: scale(1.05);
+            }
+        }
+
+        .sun-icon-inner {
+            width: 30px;
+            height: 30px;
+            background: radial-gradient(circle, #FFD700 0%, #FFA500 70%, #FF6347 100%);
+            border-radius: 50%;
+            position: relative;
+            animation: sunRotate 4s linear infinite;
+        }
+
+        .sun-icon-inner::before {
+            content: '';
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 8px;
+            background: #FFD700;
+            border-radius: 1px;
+            box-shadow: 
+                0 46px 0 #FFD700,
+                32px 8px 0 #FFD700,
+                -32px 8px 0 #FFD700,
+                23px 23px 0 #FFD700,
+                -23px 23px 0 #FFD700,
+                23px -23px 0 #FFD700,
+                -23px -23px 0 #FFD700,
+                8px 32px 0 #FFD700,
+                -8px 32px 0 #FFD700;
+        }
+
+        @keyframes sunRotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .sun-time-value {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 5px;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .sun-time-label {
+            font-size: 16px;
+            opacity: 0.8;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Beautiful Moon Card Styles */
+        .moon-visual-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 25px 0;
+            height: 150px;
+        }
+
+        .moon-phase-display {
+            position: relative;
+            width: 120px;
+            height: 120px;
+        }
+
+        .moon-sphere {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            position: relative;
+            margin: 10px;
+            background: linear-gradient(135deg, #E6E6FA 0%, #D3D3D3 50%, #A9A9A9 100%);
+            box-shadow: 
+                inset -10px -10px 20px rgba(0, 0, 0, 0.3),
+                0 0 30px rgba(230, 230, 250, 0.4);
+            animation: moonFloat 4s ease-in-out infinite;
+        }
+
+        @keyframes moonFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .moon-surface {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, 
+                rgba(255, 255, 255, 0.3) 0%, 
+                transparent 30%),
+                radial-gradient(circle at 70% 60%, 
+                rgba(169, 169, 169, 0.4) 0%, 
+                transparent 20%),
+                radial-gradient(circle at 20% 80%, 
+                rgba(128, 128, 128, 0.3) 0%, 
+                transparent 15%);
+        }
+
+        .moon-shadow-overlay {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 30%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.4) 100%);
+            border-radius: 0 50px 50px 0;
+            animation: moonPhaseShift 8s ease-in-out infinite;
+        }
+
+        @keyframes moonPhaseShift {
+            0%, 100% { width: 30%; }
+            25% { width: 10%; }
+            50% { width: 50%; }
+            75% { width: 20%; }
+        }
+
+        .moon-glow {
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: radial-gradient(circle, 
+                rgba(230, 230, 250, 0.2) 0%, 
+                rgba(230, 230, 250, 0.1) 50%, 
+                transparent 70%);
+            animation: moonGlow 3s ease-in-out infinite;
+        }
+
+        @keyframes moonGlow {
+            0%, 100% { opacity: 0.6; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+
+        .moon-stars {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 120px;
+            height: 120px;
+        }
+
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: white;
+            border-radius: 50%;
+            animation: starTwinkle 2s ease-in-out infinite;
+        }
+
+        .star-1 { top: 20px; left: 20px; animation-delay: 0s; }
+        .star-2 { top: 30px; right: 15px; animation-delay: 0.5s; }
+        .star-3 { bottom: 25px; left: 15px; animation-delay: 1s; }
+        .star-4 { bottom: 35px; right: 25px; animation-delay: 1.5s; }
+        .star-5 { top: 50px; left: 5px; animation-delay: 0.8s; }
+
+        @keyframes starTwinkle {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.5); }
+        }
+
+        .moon-info {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .moon-phase-value {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: white !important;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .moon-phase-name {
+            font-size: 18px;
+            opacity: 0.9;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: white !important;
+        }
+
+        /* Current Weather Card Styles */
+        .current-weather-icon {
+            width: 80px;
+            height: 80px;
+            margin: 20px auto;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            animation: currentWeatherFloat 4s ease-in-out infinite;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Enhanced weather icon for current card */
+        .current-card .current-weather-icon {
+            width: 100px;
+            height: 100px;
+            font-size: 50px;
+            margin: 25px auto;
+        }
+
+        @keyframes currentWeatherFloat {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-8px) scale(1.05); }
+        }
+
+        .current-condition {
+            text-align: center;
+            font-size: 24px;
+            font-weight: 600;
+            margin: 15px 0;
+            opacity: 0.9;
+        }
+
+        .current-description {
+            text-align: center;
+            font-size: 16px;
+            opacity: 0.7;
+            margin-bottom: 25px;
+            line-height: 1.4;
+        }
+
+        .weather-metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 25px 0;
+        }
+
+        /* Enhanced metrics grid for current card */
+        .current-card .weather-metrics-grid {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+            margin: 30px 0;
+        }
+
+        .metric-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Enhanced metric items for current card */
+        .current-card .metric-item {
+            padding: 20px 15px;
+        }
+
+        .metric-item:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .metric-icon {
+            font-size: 20px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .metric-value {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: white !important;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            opacity: 0.7;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: white !important;
+        }
+
+        .feels-like-display {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .feels-like-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+            color: white !important;
+        }
+
+        .feels-like-label {
+            font-size: 14px;
+            opacity: 0.8;
+            color: white !important;
+        }
+
+        /* Enhanced spacing for current card */
+        .current-card .card-header {
+            margin-bottom: 25px;
+        }
+
+        .current-card .card-main-value {
+            font-size: 84px;
+            margin: 30px 0 25px 0;
+        }
+
+        .current-card .current-condition {
+            font-size: 28px;
+            margin: 20px 0;
+        }
+
+        .current-card .feels-like-display {
+            margin: 25px 0;
+            padding: 20px;
+        }
+
+        .current-card .current-description {
+            font-size: 18px;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+
+        /* Temperature Card Specific Styles */
+        .temperature-card {
+            height: 700px;
+        }
+
+        .temperature-card .card-main-value {
+            background: linear-gradient(135deg, #ff6b6b, #ffa500);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: none;
+        }
+
+        /* Wind Card Specific Styles */
+        .wind-card .wind-direction {
+            background: rgba(16, 185, 129, 0.1);
+            border: 2px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .wind-card .wind-arrow {
+            background: linear-gradient(135deg, #10b981, #34d399);
+        }
+
+        /* Humidity Card Specific Styles */
+        .humidity-card .circular-progress .progress-circle {
+            stroke: #06b6d4;
+            filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.4));
+        }
+
+        .humidity-card .circular-value {
+            color: #06b6d4 !important;
+            text-shadow: 0 0 10px rgba(6, 182, 212, 0.3);
+        }
+
+        /* UV Card Specific Styles */
+        .uv-card .circular-progress .progress-circle {
+            stroke: #f59e0b;
+            filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.4));
+        }
+
+        .uv-card .circular-value {
+            color: #f59e0b !important;
+            text-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+        }
+
+        /* Precipitation Card Specific Styles */
+        .precipitation-card .card-main-value {
+            color: #3b82f6 !important;
+            text-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+        }
+
+        /* Pressure Card Specific Styles */
+        .pressure-card .card-main-value {
+            color: #8b5cf6 !important;
+            text-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+        }
+
+        /* Sun Card Specific Styles */
+        .sun-card .sun-time-icon {
+            box-shadow: 0 8px 25px rgba(245, 158, 11, 0.3);
+        }
+
+        .sun-card .card-main-value {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Moon Card Specific Styles */
+        .moon-card {
+            background: rgba(0, 0, 0, 0.7);
+        }
+
+        .moon-card .moon-sphere {
+            box-shadow: 
+                inset -10px -10px 20px rgba(0, 0, 0, 0.3),
+                0 0 30px rgba(230, 230, 250, 0.4),
+                0 0 60px rgba(230, 230, 250, 0.2);
+        }
+
+        /* AQI Card Specific Styles */
+        .aqi-card .aqi-indicator {
+            border: 3px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Visibility Card Specific Styles */
+        .visibility-card .card-main-value {
+            color: #64748b !important;
+            text-shadow: 0 0 20px rgba(100, 116, 139, 0.4);
+        }
+
+        /* Feels Like Card Specific Styles */
+        .feels-like-card .card-main-value {
+            background: linear-gradient(135deg, #ff9a9e, #fecfef);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Cloud Cover Card Specific Styles */
+        .cloud-cover-card .weather-icon-large {
+            background: rgba(116, 185, 255, 0.2);
+            border: 2px solid rgba(116, 185, 255, 0.3);
+        }
+
+        /* Hourly card specific sizing - much wider to accommodate the detailed layout */
+        .hourly-card {
+            width: 1000px;
+            height: 700px;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        /* Hourly Card Specific Styles */
+        .hourly-card .tab-nav {
+            display: flex;
+            background: rgba(52, 73, 94, 0.8);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .hourly-card .tab-item {
+            flex: 1;
+            padding: 15px 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .hourly-card .tab-item:last-child {
+            border-right: none;
+        }
+
+        .hourly-card .tab-item.active {
+            background: rgba(255, 193, 7, 0.9);
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        .hourly-card .tab-date {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 3px;
+        }
+
+        .hourly-card .tab-day {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 10px;
+        }
+
+        .hourly-card .tab-weather {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .hourly-card .tab-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .hourly-card .cloud { background: rgba(135, 206, 235, 0.8); }
+        .hourly-card .sun-cloud { background: linear-gradient(45deg, #ffd700 0%, #87ceeb 50%); }
+        .hourly-card .rain { background: rgba(70, 130, 180, 0.8); }
+        .hourly-card .storm { background: rgba(72, 61, 139, 0.8); }
+
+        .hourly-card .tab-temps {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .hourly-card .temp-high {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .hourly-card .temp-low {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .hourly-card .tab-content {
+            display: none;
+            padding: 25px;
+        }
+
+        .hourly-card .tab-content.active {
+            display: block;
+        }
+
+        .hourly-card .overview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .hourly-card .overview-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: white !important;
+        }
+
+        .hourly-card .feels-like-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .hourly-card .toggle-switch {
+            width: 45px;
+            height: 22px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 15px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .hourly-card .toggle-switch.active {
+            background: rgba(255, 193, 7, 0.8);
+        }
+
+        .hourly-card .toggle-knob {
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .hourly-card .toggle-switch.active .toggle-knob {
+            transform: translateX(23px);
+        }
+
+        .hourly-card .hourly-forecast {
+            background: rgba(52, 73, 94, 0.6);
+            border-radius: 15px;
+            padding: 18px;
+            margin-bottom: 25px;
+        }
+
+        .hourly-card .hourly-grid {
+            display: grid;
+            grid-template-columns: repeat(11, 1fr);
+            gap: 12px;
+            align-items: center;
+        }
+
+        .hourly-card .hourly-item {
+            text-align: center;
+        }
+
+        .hourly-card .hourly-time {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-bottom: 6px;
+            color: white !important;
+        }
+
+        .hourly-card .hourly-icon {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            margin: 0 auto 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .hourly-card .hourly-temp {
+            font-size: 13px;
+            font-weight: 500;
+            color: white !important;
+        }
+
+        .hourly-card .temp-chart {
+            background: rgba(52, 73, 94, 0.6);
+            border-radius: 15px;
+            padding: 18px;
+            position: relative;
+            height: 280px;
+            margin-bottom: 18px;
+            overflow: hidden;
+        }
+
+        .hourly-card .chart-container {
+            position: relative;
+            height: 100%;
+            width: 100%;
+            padding-left: 45px;
+        }
+
+        .hourly-card .temp-line {
+            position: absolute;
+            bottom: 70px;
+            left: 45px;
+            right: 18px;
+            height: 110px;
+            width: calc(100% - 63px);
+        }
+
+        .hourly-card .temp-curve {
+            fill: none;
+            stroke: url(#tempGradient);
+            stroke-width: 3px;
+        }
+
+        .hourly-card .temp-area {
+            fill: url(#tempGradient);
+            opacity: 0.3;
+        }
+
+        .hourly-card .sun-times {
+            position: absolute;
+            bottom: 18px;
+            left: 45px;
+            right: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .hourly-card .sun-time {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: white !important;
+        }
+
+        .hourly-card .sun-icon {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #f39c12;
+        }
+
+        .hourly-card .rain-probability {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(70, 130, 180, 0.6);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 18px;
+        }
+
+        .hourly-card .rain-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .hourly-card .rain-icon {
+            color: #87ceeb;
+            font-size: 14px;
+        }
+
+        .hourly-card .rain-percent {
+            font-size: 11px;
+            font-weight: 500;
+            color: white !important;
+        }
+
+        .hourly-card .y-axis {
+            position: absolute;
+            left: 18px;
+            top: 18px;
+            bottom: 55px;
+            width: 35px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        .hourly-card .y-label {
+            text-align: right;
+            padding-right: 8px;
+            color: white !important;
+        }
+
+        .hourly-card .rain-drops {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .hourly-card .rain-drop {
+            position: absolute;
+            width: 2px;
+            height: 10px;
+            background: linear-gradient(to bottom, rgba(135, 206, 235, 0.8), rgba(70, 130, 180, 0.6));
+            border-radius: 0 0 2px 2px;
+            animation: rainDrop 1.5s linear infinite;
+        }
+
+        @keyframes rainDrop {
+            0% {
+                transform: translateY(-18px);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(120px);
+                opacity: 0;
+            }
+        }
+
+        .hourly-card .rain-drop:nth-child(1) { left: 68%; animation-delay: 0s; }
+        .hourly-card .rain-drop:nth-child(2) { left: 69%; animation-delay: 0.2s; }
+        .hourly-card .rain-drop:nth-child(3) { left: 70%; animation-delay: 0.4s; }
+        .hourly-card .rain-drop:nth-child(4) { left: 71%; animation-delay: 0.6s; }
+        .hourly-card .rain-drop:nth-child(5) { left: 72%; animation-delay: 0.8s; }
+        .hourly-card .rain-drop:nth-child(6) { left: 73%; animation-delay: 1s; }
+        .hourly-card .rain-drop:nth-child(7) { left: 74%; animation-delay: 1.2s; }
+        .hourly-card .rain-drop:nth-child(8) { left: 75%; animation-delay: 0.3s; }
+        .hourly-card .rain-drop:nth-child(9) { left: 76%; animation-delay: 0.7s; }
+        .hourly-card .rain-drop:nth-child(10) { left: 77%; animation-delay: 0.9s; }
+
+        .gradient-bg.hourly {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 50%, #2c3e50 100%);
+        }
+        .hourly .orb1 { background: radial-gradient(circle, rgba(44, 62, 80, 0.8), transparent 70%); }
+        .hourly .orb2 { background: radial-gradient(circle, rgba(52, 73, 94, 0.6), transparent 70%); }
+        .hourly .orb3 { background: radial-gradient(circle, rgba(44, 62, 80, 0.7), transparent 70%); }
+        .hourly .orb4 { background: radial-gradient(circle, rgba(52, 73, 94, 0.5), transparent 70%); }
+        .hourly .orb5 { background: radial-gradient(circle, rgba(58, 83, 115, 0.6), transparent 70%); }
+
+        /* Ultra-wide screen adjustments */
+        @media (min-width: 1200px) {
+            .current-card {
+                width: 650px;
+                padding: 50px;
+            }
+            
+            .current-card .weather-metrics-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 22px;
+            }
+        }
+
+        /* Very small screens */
+        @media (max-width: 360px) {
+            .current-card {
+                width: 100vw;
+                padding: 20px 15px;
+                border-radius: 0;
+                min-height: 100vh;
+            }
+            
+            .current-card .card-main-value {
+                font-size: 48px;
+            }
+            
+            .current-card .card-title {
+                font-size: 22px;
+            }
+            
+            .current-card .metric-value {
+                font-size: 16px;
+            }
+            
+            .current-card .metric-label {
+                font-size: 11px;
+            }
+        }
+
+        /* Landscape orientation adjustments */
+        @media (orientation: landscape) and (max-height: 600px) {
+            .current-card {
+                max-height: 95vh;
+                padding: 25px;
+            }
+            
+            .current-card .card-main-value {
+                font-size: 56px;
+                margin: 15px 0 10px 0;
+            }
+            
+            .current-card .current-weather-icon {
+                width: 70px;
+                height: 70px;
+                font-size: 35px;
+                margin: 10px auto;
+            }
+            
+            .current-card .feels-like-display {
+                padding: 12px;
+                margin: 15px 0;
+            }
+            
+            .current-card .current-description {
+                font-size: 14px;
+                margin-bottom: 20px;
+            }
+        }
+
+        /* Improved text scaling for all screen sizes */
+        .current-card .card-title {
+            font-size: clamp(24px, 5vw, 32px);
+        }
+        
+        .current-card .card-main-value {
+            font-size: clamp(48px, 12vw, 72px);
+        }
+        
+        .current-card .current-condition {
+            font-size: clamp(20px, 4vw, 28px);
+        }
+        
+        .current-card .current-description {
+            font-size: clamp(14px, 3vw, 18px);
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated Gradient Background -->
+    <div id="gradientBg" class="gradient-bg current">
+        <div class="gradients-container">
+            <div class="gradient-orb orb1"></div>
+            <div class="gradient-orb orb2"></div>
+            <div class="gradient-orb orb3"></div>
+            <div class="gradient-orb orb4"></div>
+            <div class="gradient-orb orb5"></div>
+        </div>
+    </div>
+
+    <!-- Card counter -->
+    <div class="card-counter" id="cardCounter">1 / 13</div>
+    <div id="weatherCard" class="card">
+        <!-- Navigation areas -->
+        <div class="navigation-area nav-left" onclick="navigateCard('prev')">
+            <div class="nav-indicator">‹</div>
+        </div>
+        <div class="navigation-area nav-right" onclick="navigateCard('next')">
+            <div class="nav-indicator">›</div>
+        </div>
+        
+        
+        <!-- Card content will be populated by JavaScript -->
+        <div id="cardContent"></div>
+    </div>
+
+    <script>
+        // Global Chart.js configuration for white text - with safety checks
+        if (typeof Chart !== 'undefined') {
+            try {
+                Chart.defaults.color = 'white';
+                Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
+                Chart.defaults.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                
+                // Safely set plugin defaults
+                if (Chart.defaults.plugins) {
+                    if (Chart.defaults.plugins.legend) {
+                        Chart.defaults.plugins.legend.labels = Chart.defaults.plugins.legend.labels || {};
+                        Chart.defaults.plugins.legend.labels.color = 'white';
+                    }
+                }
+                
+                // Safely set scale defaults
+                if (Chart.defaults.scales) {
+                    if (Chart.defaults.scales.linear) {
+                        Chart.defaults.scales.linear.ticks = Chart.defaults.scales.linear.ticks || {};
+                        Chart.defaults.scales.linear.ticks.color = 'white';
+                        Chart.defaults.scales.linear.grid = Chart.defaults.scales.linear.grid || {};
+                        Chart.defaults.scales.linear.grid.color = 'rgba(255, 255, 255, 0.1)';
+                    }
+                    if (Chart.defaults.scales.category) {
+                        Chart.defaults.scales.category.ticks = Chart.defaults.scales.category.ticks || {};
+                        Chart.defaults.scales.category.ticks.color = 'white';
+                        Chart.defaults.scales.category.grid = Chart.defaults.scales.category.grid || {};
+                        Chart.defaults.scales.category.grid.color = 'rgba(255, 255, 255, 0.1)';
+                    }
+                }
+            } catch (error) {
+                console.warn('Could not set Chart.js global defaults:', error);
+            }
+        }
+
+        // Weather data - will be populated from scraped data or use fallback values
+        let weatherData = {
+            current: {
+                temperature: "34°C",
+                condition: "Haze",
+                feels_like: "39°",
+                description: "Watch for scattered rain showers. The high will reach 36° on this humid day.",
+                wind: "9 km/h",
+                humidity: "48%",
+                visibility: "8 km",
+                pressure: "1010 mb",
+                dew_point: "22°",
+                location: "Pulilan, Central Luzon",
+                time: "1:33 PM"
+            },
+            temperature: {
+                current: "30°",
+                feels_like: "36°",
+                trend: "rising",
+                high: "35°",
+                low: "24°",
+                description: "Rising with a peak of 35° at 12:00 pm.",
+                hourly_temps: [24, 25, 26, 28, 30, 32, 35, 33, 31, 29, 27, 25],
+                hourly_labels: ["12AM", "2AM", "4AM", "6AM", "8AM", "10AM", "12PM", "2PM", "4PM", "6PM", "8PM", "10PM"]
+            },
+            feels_like: {
+                current: "36°",
+                humidity_factor: "Dominant factor: humidity",
+                actual_temp: "30°",
+                description: "Feels warmer than the actual temperature due to the humidity."
+            },
+            cloud_cover: {
+                percentage: "N/A",
+                description: "Mostly clear",
+                forecast: "Decreasing with mostly sunny sky at 9:00 am.",
+                status: "Mostly clear"
+            },
+            precipitation: {
+                current: "0 cm",
+                next_24h: "in next 24h",
+                forecast: "No Precipitation",
+                description: "Rain expected tomorrow. Today is expected to see less precipitation than yesterday.",
+                hourly_precipitation: [0, 0, 0, 0.1, 0.3, 0.2, 0, 0, 0.5, 1.2, 0.8, 0.3],
+                hourly_labels: ["12AM", "2AM", "4AM", "6AM", "8AM", "10AM", "12PM", "2PM", "4PM", "6PM", "8PM", "10PM"]
+            },
+            wind: {
+                speed: "9 km/h",
+                direction: "N (0°)",
+                gust: "26 km/h",
+                force: "2 (Light Breeze)",
+                description: "Steady with averages holding at 6 km/h (gusts to 18) expected from NNE through morning.",
+                hourly_speed: [6, 7, 8, 9, 12, 15, 18, 16, 14, 11, 9, 7],
+                hourly_gusts: [12, 14, 16, 18, 22, 26, 28, 24, 20, 18, 15, 13],
+                hourly_labels: ["12AM", "2AM", "4AM", "6AM", "8AM", "10AM", "12PM", "2PM", "4PM", "6PM", "8PM", "10PM"]
+            },
+            humidity: {
+                current: "64%",
+                relative: "Relative Humidity",
+                dew_point: "22°",
+                description: "Humid",
+                forecast: "Decreasing with a low of 48% at 12:00 pm.",
+                hourly_humidity: [72, 70, 68, 65, 64, 60, 58, 55, 52, 48, 50, 55],
+                hourly_labels: ["12AM", "2AM", "4AM", "6AM", "8AM", "10AM", "12PM", "2PM", "4PM", "6PM", "8PM", "10PM"]
+            },
+            uv: {
+                index: "7",
+                level: "High",
+                description: "Maximum UV exposure for today will be high, expected at 12:00 pm.",
+                hourly_uv: [0, 0, 0, 1, 3, 5, 7, 8, 6, 4, 2, 0],
+                hourly_labels: ["12AM", "2AM", "4AM", "6AM", "8AM", "10AM", "12PM", "2PM", "4PM", "6PM", "8PM", "10PM"]
+            },
+            aqi: {
+                value: "76",
+                status: "Moderate",
+                pollutant: "PM2.5 30 μg/m³",
+                description: "Deteriorating air quality with primary pollutant: PM2.5 30 μg/m³."
+            },
+            visibility: {
+                distance: "7 km",
+                status: "Good",
+                description: "Improving with a peak visibility distance of 45 km expected at 12:00 pm.",
+                hourly_visibility: [5, 6, 7, 8, 10, 15, 25, 35, 45, 40, 30, 20],
+                hourly_labels: ["12AM", "2AM", "4AM", "6AM", "8AM", "10AM", "12PM", "2PM", "4PM", "6PM", "8PM", "10PM"]
+            },
+            pressure: {
+                current: "1009 mb",
+                time: "8:20 AM (Now)",
+                trend: "Falling slowly",
+                description: "Falling slowly in the last 3 hours. Expected to rise slowly in the next 3 hours.",
+                hourly_pressure: [1015, 1013, 1012, 1011, 1009, 1008, 1007, 1008, 1010, 1012, 1014, 1015],
+                hourly_labels: ["12AM", "2AM", "4AM", "6AM", "8AM", "10AM", "12PM", "2PM", "4PM", "6PM", "8PM", "10PM"]
+            },
+            sun: {
+                sunrise: "5:26 AM",
+                sunset: "6:21 PM",
+                duration: "12 hrs 54 mins",
+                moonrise: "5:06 AM",
+                moonset: "6:39 PM",
+                moon_duration: "13 hrs 33 mins"
+            },
+            moon: {
+                phase: "0%",
+                description: "Phase of moon",
+                next_full: "Jun 10",
+                illumination: "New Moon"
+            },
+            hourly: {
+                days: [
+                    { date: "28", day: "Yesterday", icon: "☁️", iconClass: "cloud", high: "35°", low: "27°" },
+                    { date: "29", day: "Today", icon: "🌤️", iconClass: "sun-cloud", high: "34°", low: "27°", active: true },
+                    { date: "30", day: "Fri", icon: "🌧️", iconClass: "rain", high: "32°", low: "26°" },
+                    { date: "31", day: "Sat", icon: "⛈️", iconClass: "storm", high: "31°", low: "26°" },
+                    { date: "1", day: "Sun", icon: "🌧️", iconClass: "rain", high: "31°", low: "26°" },
+                    { date: "2", day: "Mon", icon: "🌤️", iconClass: "sun-cloud", high: "32°", low: "27°" }
+                ],
+                hourlyData: [
+                    { time: "4 AM", icon: "☁️", iconClass: "cloud", temp: "27°" },
+                    { time: "Now", icon: "☀️", iconClass: "sun-cloud", temp: "28°" },
+                    { time: "8 AM", icon: "☁️", iconClass: "cloud", temp: "28°" },
+                    { time: "10 AM", icon: "🌤️", iconClass: "sun-cloud", temp: "31°" },
+                    { time: "12 PM", icon: "🌤️", iconClass: "sun-cloud", temp: "34°" },
+                    { time: "2 PM", icon: "🌤️", iconClass: "sun-cloud", temp: "34°" },
+                    { time: "4 PM", icon: "🌤️", iconClass: "sun-cloud", temp: "34°" },
+                    { time: "6 PM", icon: "☁️", iconClass: "cloud", temp: "33°" },
+                    { time: "8 PM", icon: "🌧️", iconClass: "rain", temp: "30°" },
+                    { time: "10 PM", icon: "☁️", iconClass: "cloud", temp: "29°" },
+                    { time: "12 AM", icon: "☁️", iconClass: "cloud", temp: "29°" }
+                ],
+                rainProbability: ["6%", "5%", "11%", "15%", "21%", "24%", "9%", "23%", "22%", "41%"],
+                sunrise: "5:26 AM",
+                sunset: "6:21 PM"
+            }
+        };
+
+        function getUrlParameter(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+
+        // Function to load real weather data from scraped JSON files or API
+        async function loadWeatherData() {
+            try {
+                console.log('Attempting to load real weather data...');
+                
+                // Try to load from URL parameter or default to latest API data
+                const dataParam = getUrlParameter('data');
+                let dataUrl;
+                
+                if (dataParam) {
+                    // Check if it's an API endpoint or direct file
+                    if (dataParam.startsWith('api/')) {
+                        dataUrl = `/${dataParam}`;
+                    } else {
+                        dataUrl = dataParam;
+                    }
+                } else {
+                    // Default to latest weather data from API
+                    dataUrl = '/api/weather/latest';
+                }
+                
+                console.log('Loading weather data from:', dataUrl);
+                
+                const response = await fetch(dataUrl);
+                if (!response.ok) {
+                    throw new Error(`Failed to load weather data: ${response.status}`);
+                }
+                
+                const apiResponse = await response.json();
+                console.log('API Response:', apiResponse);
+                
+                // Extract data from API response structure
+                let scrapedData;
+                if (apiResponse.status === 'success' && apiResponse.data) {
+                    scrapedData = apiResponse.data;
+                    console.log('Using API-served weather data');
+                } else {
+                    // Direct JSON file response
+                    scrapedData = apiResponse;
+                    console.log('Using direct JSON file data');
+                }
+                
+                console.log('Loaded scraped weather data:', scrapedData);
+                
+                // Extract enhanced hourly data if available
+                const enhancedHourly = scrapedData.enhanced_hourly_data || {};
+                const textData = scrapedData.text_data || {};
+                
+                // Update weather data with real scraped values
+                updateWeatherDataFromScraped(scrapedData, enhancedHourly);
+                
+                console.log('Successfully integrated real weather data');
+                return true;
+                
+            } catch (error) {
+                console.warn('Could not load real weather data, using fallback values:', error);
+                return false;
+            }
+        }
+
+        // Function to update weatherData with real scraped values
+        function updateWeatherDataFromScraped(scrapedData, enhancedHourly) {
+            const textData = scrapedData.text_data || {};
+            
+            console.log('Updating weather data from scraped data:', textData);
+            
+            // Update current weather data
+            if (textData.temperature) {
+                weatherData.current.temperature = textData.temperature;
+            }
+            if (textData.conditions) {
+                weatherData.current.condition = textData.conditions;
+            }
+            if (textData.heat_index) {
+                weatherData.current.feels_like = textData.heat_index;
+            }
+            if (textData.wind) {
+                weatherData.current.wind = textData.wind;
+            }
+            if (textData.humidity) {
+                weatherData.current.humidity = textData.humidity;
+            }
+            if (textData.visibility) {
+                weatherData.current.visibility = textData.visibility;
+            }
+            if (textData.pressure) {
+                weatherData.current.pressure = textData.pressure;
+            }
+            if (textData.location && textData.region) {
+                weatherData.current.location = `${textData.location}, ${textData.region}`;
+            }
+            if (textData.current_time) {
+                weatherData.current.time = textData.current_time;
+            }
+            if (textData.weather_summary) {
+                weatherData.current.description = textData.weather_summary;
+            }
+            
+            // Calculate dew point from humidity and temperature if not available
+            if (textData.humidity && textData.temperature) {
+                const temp = parseFloat(textData.temperature.replace('°C', ''));
+                const humidity = parseFloat(textData.humidity.replace('%', ''));
+                const dewPoint = Math.round(temp - ((100 - humidity) / 5));
+                weatherData.current.dew_point = `${dewPoint}°`;
+            }
+            
+            console.log('Updated current weather data:', weatherData.current);
+
+            // Update temperature data
+            if (enhancedHourly.overview && enhancedHourly.overview.hourly_temperature) {
+                weatherData.temperature.hourly_temps = enhancedHourly.overview.hourly_temperature;
+                console.log('Updated temperature hourly data:', weatherData.temperature.hourly_temps);
+            }
+            
+            if (enhancedHourly.overview && enhancedHourly.overview.time_labels) {
+                weatherData.temperature.hourly_labels = enhancedHourly.overview.time_labels;
+                console.log('Updated time labels:', weatherData.temperature.hourly_labels);
+            }
+            
+            // Update current temperature from text data
+            if (textData.temperature) {
+                weatherData.temperature.current = textData.temperature;
+            }
+            if (textData.heat_index) {
+                weatherData.temperature.feels_like = textData.heat_index;
+            }
+            
+            // Update forecast data for temperature card
+            if (scrapedData.forecast && scrapedData.forecast.daily) {
+                const todayForecast = scrapedData.forecast.daily.find(day => day.date === 'Today');
+                if (todayForecast) {
+                    weatherData.temperature.high = todayForecast.high;
+                    weatherData.temperature.low = todayForecast.low;
+                }
+            }
+
+            // Update wind data
+            if (enhancedHourly.wind) {
+                if (enhancedHourly.wind.hourly_wind_speed) {
+                    weatherData.wind.hourly_speed = enhancedHourly.wind.hourly_wind_speed;
+                    console.log('Updated wind speed data:', weatherData.wind.hourly_speed);
+                }
+                if (enhancedHourly.wind.hourly_wind_gusts) {
+                    weatherData.wind.hourly_gusts = enhancedHourly.wind.hourly_wind_gusts;
+                    console.log('Updated wind gust data:', weatherData.wind.hourly_gusts);
+                }
+                if (enhancedHourly.wind.time_labels) {
+                    weatherData.wind.hourly_labels = enhancedHourly.wind.time_labels;
+                }
+            }
+            
+            // Update current wind from text data
+            if (textData.wind) {
+                weatherData.wind.speed = textData.wind;
+            }
+            
+            // Update humidity data
+            if (enhancedHourly.humidity) {
+                if (enhancedHourly.humidity.hourly_humidity) {
+                    weatherData.humidity.hourly_humidity = enhancedHourly.humidity.hourly_humidity;
+                    console.log('Updated humidity data:', weatherData.humidity.hourly_humidity);
+                }
+                if (enhancedHourly.humidity.time_labels) {
+                    weatherData.humidity.hourly_labels = enhancedHourly.humidity.time_labels;
+                }
+            }
+            
+            // Update current humidity from text data
+            if (textData.humidity) {
+                weatherData.humidity.current = textData.humidity;
+            }
+            
+            // Update precipitation data
+            if (enhancedHourly.precipitation) {
+                if (enhancedHourly.precipitation.hourly_precipitation) {
+                    weatherData.precipitation.hourly_precipitation = enhancedHourly.precipitation.hourly_precipitation;
+                    console.log('Updated precipitation data:', weatherData.precipitation.hourly_precipitation);
+                }
+                if (enhancedHourly.precipitation.time_labels) {
+                    weatherData.precipitation.hourly_labels = enhancedHourly.precipitation.time_labels;
+                }
+            }
+            
+            // Update pressure data (use temperature time labels if pressure doesn't have its own)
+            if (enhancedHourly.overview && enhancedHourly.overview.time_labels) {
+                weatherData.pressure.hourly_labels = enhancedHourly.overview.time_labels;
+            }
+            
+            // Update current pressure from text data
+            if (textData.pressure) {
+                weatherData.pressure.current = textData.pressure;
+            }
+            
+            // Update UV data (use temperature time labels if UV doesn't have its own)
+            if (enhancedHourly.overview && enhancedHourly.overview.time_labels) {
+                weatherData.uv.hourly_labels = enhancedHourly.overview.time_labels;
+            }
+            
+            // Update current UV from text data
+            if (textData.uv_index) {
+                weatherData.uv.index = textData.uv_index;
+            }
+            
+            // Update visibility data (use temperature time labels if visibility doesn't have its own)
+            if (enhancedHourly.overview && enhancedHourly.overview.time_labels) {
+                weatherData.visibility.hourly_labels = enhancedHourly.overview.time_labels;
+            }
+            
+            // Update current visibility from text data
+            if (textData.visibility) {
+                weatherData.visibility.distance = textData.visibility;
+            }
+            
+            // Update AQI data
+            if (enhancedHourly.air_quality) {
+                if (enhancedHourly.air_quality.hourly_aqi) {
+                    // Create a simple mapping for AQI status
+                    const avgAqi = enhancedHourly.air_quality.hourly_aqi.reduce((a, b) => a + b, 0) / enhancedHourly.air_quality.hourly_aqi.length;
+                    weatherData.aqi.value = Math.round(avgAqi).toString();
+                    console.log('Updated AQI data:', weatherData.aqi.value);
+                }
+            }
+            
+            // Update location data
+            if (textData.location) {
+                // Update any location-specific data if needed
+                console.log('Location:', textData.location, textData.region);
+            }
+            
+            console.log('Weather data integration complete');
+        }
+
+        function createChart(canvasId, type, data, options = {}) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return null;
+            
+            // Set Chart.js global defaults for white text with error handling
+            try {
+                if (typeof Chart !== 'undefined') {
+                    Chart.defaults.color = 'white';
+                    Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
+                    Chart.defaults.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                }
+            } catch (error) {
+                console.warn('Could not set Chart.js defaults in createChart:', error);
+            }
+            
+            const defaultOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false,
+                        labels: {
+                            color: 'white'
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: 'white',
+                            font: {
+                                size: 10
+                            }
+                        },
+                        title: {
+                            color: 'white'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: 'white',
+                            font: {
+                                size: 10
+                            }
+                        },
+                        title: {
+                            color: 'white'
+                        }
+                    }
+                }
+            };
+
+            // Deep merge function to properly combine options
+            function deepMerge(target, source) {
+                const result = { ...target };
+                for (const key in source) {
+                    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+                        result[key] = deepMerge(result[key] || {}, source[key]);
+                    } else {
+                        result[key] = source[key];
+                    }
+                }
+                return result;
+            }
+
+            const mergedOptions = deepMerge(defaultOptions, options);
+            
+            // Force white text colors in merged options
+            try {
+                if (mergedOptions.scales) {
+                    if (mergedOptions.scales.x && mergedOptions.scales.x.ticks) {
+                        mergedOptions.scales.x.ticks.color = 'white';
+                    }
+                    if (mergedOptions.scales.y && mergedOptions.scales.y.ticks) {
+                        mergedOptions.scales.y.ticks.color = 'white';
+                    }
+                    if (mergedOptions.scales.x && mergedOptions.scales.x.title) {
+                        mergedOptions.scales.x.title.color = 'white';
+                    }
+                    if (mergedOptions.scales.y && mergedOptions.scales.y.title) {
+                        mergedOptions.scales.y.title.color = 'white';
+                    }
+                }
+            } catch (error) {
+                console.warn('Could not force white text colors in chart options:', error);
+            }
+            
+            return new Chart(ctx, {
+                type: type,
+                data: data,
+                options: mergedOptions
+            });
+        }
+
+        function createCurrentCard() {
+            const data = weatherData.current;
+            return `
+                <div class="card-content-wrapper">
+                    <div class="card-header">
+                        <div class="card-icon">🏠</div>
+                        <div class="card-title">${data.location}</div>
+                    </div>
+                    <div style="text-align: center; margin: 20px 0;">
+                        <div style="font-size: 16px; opacity: 0.8; margin-bottom: 5px;">Current weather</div>
+                        <div style="font-size: 18px; opacity: 0.9; margin-bottom: 20px;">${data.time}</div>
+                    </div>
+                    <div class="current-weather-icon">☁️</div>
+                    <div class="card-main-value" style="font-size: 72px; text-align: center;">${data.temperature}</div>
+                    <div class="current-condition">${data.condition}</div>
+                    <div class="feels-like-display">
+                        <div class="feels-like-value">Feels like ${data.feels_like}</div>
+                        <div class="feels-like-label">Heat Index</div>
+                    </div>
+                    <div class="current-description">${data.description}</div>
+                    <div class="weather-metrics-grid">
+                        <div class="metric-item">
+                            <span class="metric-icon">💨</span>
+                            <div class="metric-value">${data.wind}</div>
+                            <div class="metric-label">Wind</div>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-icon">💧</span>
+                            <div class="metric-value">${data.humidity}</div>
+                            <div class="metric-label">Humidity</div>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-icon">👁️</span>
+                            <div class="metric-value">${data.visibility}</div>
+                            <div class="metric-label">Visibility</div>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-icon">📊</span>
+                            <div class="metric-value">${data.pressure}</div>
+                            <div class="metric-label">Pressure</div>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-icon">🌡️</span>
+                            <div class="metric-value">${data.dew_point}</div>
+                            <div class="metric-label">Dew Point</div>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-icon">🌤️</span>
+                            <div class="metric-value">UV ${weatherData.uv ? weatherData.uv.index : '6'}</div>
+                            <div class="metric-label">UV Index</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createTemperatureCard() {
+            const data = weatherData.temperature;
+            const html = `
+                <div class="card-header">
+                    <div class="card-icon">🌡️</div>
+                    <div class="card-title">Temperature</div>
+                </div>
+                <div class="card-main-value">${data.current}</div>
+                <div class="card-subtitle">${data.description}</div>
+                <div class="chart-container">
+                    <canvas id="tempChart" class="chart-canvas"></canvas>
+                </div>
+                <div class="card-details">
+                    <div class="detail-row">
+                        <span class="detail-label">Feels like</span>
+                        <span class="detail-value">${data.feels_like}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">High</span>
+                        <span class="detail-value">${data.high}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Low</span>
+                        <span class="detail-value">${data.low}</span>
+                    </div>
+                </div>
+                <div class="trend-indicator">
+                    <div class="trend-arrow trend-up"></div>
+                    <span>Rising</span>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                console.log('Creating temperature chart with data:', data.hourly_temps);
+                createChart('tempChart', 'line', {
+                    labels: data.hourly_labels,
+                    datasets: [{
+                        data: data.hourly_temps,
+                        borderColor: '#4ade80',
+                        backgroundColor: 'rgba(74, 222, 128, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#4ade80',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4
+                    }]
+                });
+            }, 100);
+            
+            return html;
+        }
+
+        function createFeelsLikeCard() {
+            const data = weatherData.feels_like;
+            return `
+                <div class="card-header">
+                    <div class="card-icon">🔥</div>
+                    <div class="card-title">Feels like</div>
+                </div>
+                <div class="card-main-value">${data.current}</div>
+                <div class="card-subtitle">${data.humidity_factor}</div>
+                <div class="card-details">
+                    <div class="detail-row">
+                        <span class="detail-label">Temperature</span>
+                        <span class="detail-value">${data.actual_temp}</span>
+                    </div>
+                </div>
+                <div style="margin-top: 20px; font-size: 18px; opacity: 0.8;">
+                    ${data.description}
+                </div>
+            `;
+        }
+
+        function createCloudCoverCard() {
+            const data = weatherData.cloud_cover;
+            return `
+                <div class="card-header">
+                    <div class="card-icon">☁️</div>
+                    <div class="card-title">Cloud cover</div>
+                </div>
+                <div class="weather-icon-large">🌤️</div>
+                <div class="card-main-value" style="font-size: 48px; text-align: center;">${data.status}</div>
+                <div class="card-subtitle" style="text-align: center;">${data.percentage}</div>
+                <div style="margin-top: 25px; font-size: 18px; opacity: 0.8; text-align: center;">
+                    ${data.forecast}
+                </div>
+            `;
+        }
+
+        function createPrecipitationCard() {
+            const data = weatherData.precipitation;
+            const html = `
+                <div class="card-header">
+                    <div class="card-icon">🌧️</div>
+                    <div class="card-title">Precipitation</div>
+                </div>
+                <div class="card-main-value">${data.current}</div>
+                <div class="card-subtitle">${data.next_24h}</div>
+                <div class="chart-container">
+                    <canvas id="precipChart" class="chart-canvas"></canvas>
+                </div>
+                <div class="card-details">
+                    <div class="detail-row">
+                        <span class="detail-label">Status</span>
+                        <span class="detail-value">${data.forecast}</span>
+                    </div>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                createChart('precipChart', 'bar', {
+                    labels: data.hourly_labels,
+                    datasets: [{
+                        data: data.hourly_precipitation,
+                        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    }]
+                }, {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'mm',
+                                color: 'white',
+                                font: {
+                                    size: 10
+                                }
+                            }
+                        }
+                    }
+                });
+            }, 100);
+            
+            return html;
+        }
+
+        function createWindCard() {
+            const data = weatherData.wind;
+            const html = `
+                <div class="card-header">
+                    <div class="card-icon">💨</div>
+                    <div class="card-title">Wind</div>
+                </div>
+                <div class="wind-direction">
+                    <div class="wind-arrow"></div>
+                </div>
+                <div class="card-main-value" style="font-size: 56px; text-align: center;">${data.speed}</div>
+                <div class="card-subtitle" style="text-align: center;">Wind Speed</div>
+                <div class="mini-chart-container">
+                    <canvas id="windChart" class="chart-canvas"></canvas>
+                </div>
+                <div class="card-details">
+                    <div class="detail-row">
+                        <span class="detail-label">From ${data.direction}</span>
+                        <span class="detail-value">${data.gust}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Force: ${data.force}</span>
+                        <span class="detail-value">Wind Gust</span>
+                    </div>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                console.log('Creating wind chart with speed:', data.hourly_speed, 'and gusts:', data.hourly_gusts);
+                createChart('windChart', 'line', {
+                    labels: data.hourly_labels,
+                    datasets: [{
+                        label: 'Speed',
+                        data: data.hourly_speed,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        pointBackgroundColor: '#10b981',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 1,
+                        pointRadius: 2
+                    }, {
+                        label: 'Gusts',
+                        data: data.hourly_gusts,
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        pointBackgroundColor: '#f59e0b',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 1,
+                        pointRadius: 2
+                    }]
+                });
+            }, 100);
+            
+            return html;
+        }
+
+        function createHumidityCard() {
+            const data = weatherData.humidity;
+            const percentage = parseInt(data.current);
+            const html = `
+                <div class="card-header">
+                    <div class="card-icon">💧</div>
+                    <div class="card-title">Humidity</div>
+                </div>
+                <div class="circular-progress">
+                    <svg>
+                        <circle class="bg-circle" cx="70" cy="70" r="60"></circle>
+                        <circle class="progress-circle" cx="70" cy="70" r="60" 
+                                style="stroke-dashoffset: ${377 - (377 * percentage / 100)}"></circle>
+                    </svg>
+                    <div class="circular-value">${data.current}</div>
+                </div>
+                <div class="mini-chart-container">
+                    <canvas id="humidityChart" class="chart-canvas"></canvas>
+                </div>
+                <div class="card-details">
+                    <div class="detail-row">
+                        <span class="detail-label">Dew point</span>
+                        <span class="detail-value">${data.dew_point}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Status</span>
+                        <span class="detail-value">${data.description}</span>
+                    </div>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                console.log('Creating humidity chart with data:', data.hourly_humidity);
+                createChart('humidityChart', 'line', {
+                    labels: data.hourly_labels,
+                    datasets: [{
+                        data: data.hourly_humidity,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#3b82f6',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 1,
+                        pointRadius: 3
+                    }]
+                });
+            }, 100);
+            
+            return html;
+        }
+
+        function createUVCard() {
+            const data = weatherData.uv;
+            const uvValue = parseInt(data.index);
+            const html = `
+                <div class="card-header">
+                    <div class="card-icon">☀️</div>
+                    <div class="card-title">UV</div>
+                </div>
+                <div class="circular-progress">
+                    <svg>
+                        <circle class="bg-circle" cx="70" cy="70" r="60"></circle>
+                        <circle class="progress-circle" cx="70" cy="70" r="60" 
+                                style="stroke-dashoffset: ${377 - (377 * uvValue / 12)}; stroke: #f59e0b;"></circle>
+                    </svg>
+                    <div class="circular-value">${data.index}</div>
+                </div>
+                <div class="card-subtitle" style="text-align: center;">${data.level}</div>
+                <div class="mini-chart-container">
+                    <canvas id="uvChart" class="chart-canvas"></canvas>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                createChart('uvChart', 'bar', {
+                    labels: data.hourly_labels,
+                    datasets: [{
+                        data: data.hourly_uv,
+                        backgroundColor: data.hourly_uv.map(uv => {
+                            if (uv <= 2) return 'rgba(34, 197, 94, 0.8)';
+                            if (uv <= 5) return 'rgba(234, 179, 8, 0.8)';
+                            if (uv <= 7) return 'rgba(249, 115, 22, 0.8)';
+                            if (uv <= 10) return 'rgba(239, 68, 68, 0.8)';
+                            return 'rgba(147, 51, 234, 0.8)';
+                        }),
+                        borderColor: 'rgba(255, 255, 255, 0.3)',
+                        borderWidth: 1
+                    }]
+                }, {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 12
+                        }
+                    }
+                });
+            }, 100);
+            
+            return html;
+        }
+
+        function createAQICard() {
+            const data = weatherData.aqi;
+            return `
+                <div class="card-header">
+                    <div class="card-icon">🏭</div>
+                    <div class="card-title">AQI</div>
+                </div>
+                <div class="aqi-indicator moderate">
+                    ${data.value}
+                </div>
+                <div class="card-subtitle" style="text-align: center;">${data.status}</div>
+                <div class="card-details">
+                    <div class="detail-row">
+                        <span class="detail-label">Primary pollutant</span>
+                        <span class="detail-value">${data.pollutant}</span>
+                    </div>
+                </div>
+                <div style="margin-top: 20px; font-size: 18px; opacity: 0.8; text-align: center;">
+                    ${data.description}
+                </div>
+            `;
+        }
+
+        function createVisibilityCard() {
+            const data = weatherData.visibility;
+            const visibilityKm = parseInt(data.distance);
+            const html = `
+                <div class="card-header">
+                    <div class="card-icon">👁️</div>
+                    <div class="card-title">Visibility</div>
+                </div>
+                <div class="card-main-value">${data.distance}</div>
+                <div class="card-subtitle">${data.status}</div>
+                <div class="chart-container">
+                    <canvas id="visibilityChart" class="chart-canvas"></canvas>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${Math.min(visibilityKm * 2, 100)}%"></div>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                createChart('visibilityChart', 'line', {
+                    labels: data.hourly_labels,
+                    datasets: [{
+                        data: data.hourly_visibility,
+                        borderColor: '#06b6d4',
+                        backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#06b6d4',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4
+                    }]
+                }, {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'km',
+                                color: 'white',
+                                font: {
+                                    size: 10
+                                }
+                            }
+                        }
+                    }
+                });
+            }, 100);
+            
+            return html;
+        }
+
+        function createPressureCard() {
+            const data = weatherData.pressure;
+            const html = `
+                <div class="card-header">
+                    <div class="card-icon">📊</div>
+                    <div class="card-title">Pressure</div>
+                </div>
+                <div class="card-main-value">${data.current}</div>
+                <div class="card-subtitle">${data.time}</div>
+                <div class="chart-container">
+                    <canvas id="pressureChart" class="chart-canvas"></canvas>
+                </div>
+                <div class="card-details">
+                    <div class="detail-row">
+                        <span class="detail-label">Trend</span>
+                        <span class="detail-value">${data.trend}</span>
+                    </div>
+                </div>
+                <div class="trend-indicator">
+                    <div class="trend-arrow trend-down"></div>
+                    <span>Falling slowly</span>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                createChart('pressureChart', 'line', {
+                    labels: data.hourly_labels,
+                    datasets: [{
+                        data: data.hourly_pressure,
+                        borderColor: '#8b5cf6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#8b5cf6',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4
+                    }]
+                });
+            }, 100);
+            
+            return html;
+        }
+
+        function createSunCard() {
+            const data = weatherData.sun;
+            return `
+                <div class="card-header">
+                    <div class="card-icon">☀️</div>
+                    <div class="card-title">Sun</div>
+                </div>
+                <div class="sun-arc-container">
+                    <svg class="sun-arc" viewBox="0 0 200 120" width="200" height="120">
+                        <!-- Sky gradient background -->
+                        <defs>
+                            <linearGradient id="skyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" style="stop-color:#87CEEB;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#FFE4B5;stop-opacity:1" />
+                            </linearGradient>
+                            <radialGradient id="sunGradient" cx="50%" cy="50%" r="50%">
+                                <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+                                <stop offset="70%" style="stop-color:#FFA500;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#FF6347;stop-opacity:0.8" />
+                            </radialGradient>
+                        </defs>
+                        
+                        <!-- Sky background -->
+                        <rect width="200" height="120" fill="url(#skyGradient)" rx="10"/>
+                        
+                        <!-- Horizon line -->
+                        <line x1="0" y1="100" x2="200" y2="100" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+                        
+                        <!-- Sun path arc -->
+                        <path d="M 20 100 Q 100 30 180 100" stroke="rgba(255,255,255,0.4)" stroke-width="2" fill="none" stroke-dasharray="5,5"/>
+                        
+                        <!-- Animated sun -->
+                        <circle class="sun-position" cx="100" cy="65" r="8" fill="url(#sunGradient)">
+                            <animate attributeName="cy" values="65;60;65" dur="3s" repeatCount="indefinite"/>
+                        </circle>
+                        
+                        <!-- Sun rays -->
+                        <g class="sun-rays" transform="translate(100,65)">
+                            <line x1="-15" y1="0" x2="-12" y2="0" stroke="#FFD700" stroke-width="2" opacity="0.8">
+                                <animate attributeName="opacity" values="0.8;0.4;0.8" dur="2s" repeatCount="indefinite"/>
+                            </line>
+                            <line x1="12" y1="0" x2="15" y2="0" stroke="#FFD700" stroke-width="2" opacity="0.8">
+                                <animate attributeName="opacity" values="0.4;0.8;0.4" dur="2s" repeatCount="indefinite"/>
+                            </line>
+                            <line x1="0" y1="-15" x2="0" y2="-12" stroke="#FFD700" stroke-width="2" opacity="0.8">
+                                <animate attributeName="opacity" values="0.8;0.4;0.8" dur="2s" repeatCount="indefinite"/>
+                            </line>
+                            <line x1="0" y1="12" x2="0" y2="15" stroke="#FFD700" stroke-width="2" opacity="0.8">
+                                <animate attributeName="opacity" values="0.4;0.8;0.4" dur="2s" repeatCount="indefinite"/>
+                            </line>
+                            <line x1="-11" y1="-11" x2="-8" y2="-8" stroke="#FFD700" stroke-width="2" opacity="0.6">
+                                <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite"/>
+                            </line>
+                            <line x1="8" y1="8" x2="11" y2="11" stroke="#FFD700" stroke-width="2" opacity="0.6">
+                                <animate attributeName="opacity" values="0.3;0.6;0.3" dur="2s" repeatCount="indefinite"/>
+                            </line>
+                            <line x1="11" y1="-11" x2="8" y2="-8" stroke="#FFD700" stroke-width="2" opacity="0.6">
+                                <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite"/>
+                            </line>
+                            <line x1="-8" y1="8" x2="-11" y2="11" stroke="#FFD700" stroke-width="2" opacity="0.6">
+                                <animate attributeName="opacity" values="0.3;0.6;0.3" dur="2s" repeatCount="indefinite"/>
+                            </line>
+                        </g>
+                        
+                        <!-- Sunrise marker -->
+                        <circle cx="30" cy="95" r="3" fill="#FF6B6B" opacity="0.8"/>
+                        <text x="30" y="110" text-anchor="middle" fill="white" font-size="8" opacity="0.9">Sunrise</text>
+                        
+                        <!-- Sunset marker -->
+                        <circle cx="170" cy="95" r="3" fill="#FF6B6B" opacity="0.8"/>
+                        <text x="170" y="110" text-anchor="middle" fill="white" font-size="8" opacity="0.9">Sunset</text>
+                    </svg>
+                </div>
+                <div class="sun-times-display">
+                    <div class="sun-time-item">
+                        <div class="sun-time-icon sunrise-icon">
+                            <div class="sun-icon-inner"></div>
+                        </div>
+                        <div class="sun-time-value">${data.sunrise}</div>
+                        <div class="sun-time-label">Sunrise</div>
+                    </div>
+                    <div class="sun-time-item">
+                        <div class="sun-time-icon sunset-icon">
+                            <div class="sun-icon-inner"></div>
+                        </div>
+                        <div class="sun-time-value">${data.sunset}</div>
+                        <div class="sun-time-label">Sunset</div>
+                    </div>
+                </div>
+                <div class="card-details">
+                    <div class="detail-row">
+                        <span class="detail-label">Daylight Duration</span>
+                        <span class="detail-value">${data.duration}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createMoonCard() {
+            const data = weatherData.moon;
+            return `
+                <div class="card-header">
+                    <div class="card-icon">🌙</div>
+                    <div class="card-title">Moon</div>
+                </div>
+                <div class="moon-visual-container">
+                    <div class="moon-phase-display">
+                        <div class="moon-sphere">
+                            <div class="moon-surface"></div>
+                            <div class="moon-shadow-overlay"></div>
+                            <div class="moon-glow"></div>
+                        </div>
+                        <div class="moon-stars">
+                            <div class="star star-1"></div>
+                            <div class="star star-2"></div>
+                            <div class="star star-3"></div>
+                            <div class="star star-4"></div>
+                            <div class="star star-5"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="moon-info">
+                    <div class="moon-phase-value">${data.phase}</div>
+                    <div class="moon-phase-name">${data.illumination}</div>
+                </div>
+                <div class="card-details">
+                    <div class="detail-row">
+                        <span class="detail-label">Current Phase</span>
+                        <span class="detail-value">${data.illumination}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Next Full Moon</span>
+                        <span class="detail-value">${data.next_full}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createHourlyCard() {
+            const data = weatherData.hourly;
+            
+            // Generate tab items
+            const tabItems = data.days.map(day => `
+                <div class="tab-item ${day.active ? 'active' : ''}">
+                    <div class="tab-date">${day.date}</div>
+                    <div class="tab-day">${day.day}</div>
+                    <div class="tab-weather">
+                        <div class="tab-icon ${day.iconClass}">${day.icon}</div>
+                        <div class="tab-temps">
+                            <div class="temp-high">${day.high}</div>
+                            <div class="temp-low">${day.low}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Generate hourly items
+            const hourlyItems = data.hourlyData.map(hour => `
+                <div class="hourly-item">
+                    <div class="hourly-time">${hour.time}</div>
+                    <div class="hourly-icon ${hour.iconClass}">${hour.icon}</div>
+                    <div class="hourly-temp">${hour.temp}</div>
+                </div>
+            `).join('');
+            
+            // Generate rain probability items
+            const rainItems = data.rainProbability.map(percent => `
+                <div class="rain-item">
+                    <div class="rain-icon">💧</div>
+                    <div class="rain-percent">${percent}</div>
+                </div>
+            `).join('');
+            
+            const html = `
+                <div class="tab-nav">
+                    ${tabItems}
+                </div>
+                
+                <div class="tab-content active">
+                    <div class="overview-header">
+                        <h2 class="overview-title">Overview</h2>
+                        <div class="feels-like-toggle">
+                            <div class="toggle-switch active">
+                                <div class="toggle-knob"></div>
+                            </div>
+                            <span>Feels like</span>
+                        </div>
+                    </div>
+
+                    <div class="hourly-forecast">
+                        <div class="hourly-grid">
+                            ${hourlyItems}
+                        </div>
+                    </div>
+
+                    <div class="temp-chart">
+                        <div class="y-axis">
+                            <div class="y-label">55°</div>
+                            <div class="y-label">45°</div>
+                            <div class="y-label">35°</div>
+                            <div class="y-label">25°</div>
+                            <div class="y-label">15°</div>
+                        </div>
+                        
+                        <div class="chart-container">
+                            <svg class="temp-line" viewBox="0 0 800 120">
+                                <defs>
+                                    <linearGradient id="tempGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" style="stop-color:#87ceeb;stop-opacity:1" />
+                                        <stop offset="20%" style="stop-color:#ffd700;stop-opacity:1" />
+                                        <stop offset="60%" style="stop-color:#ff6b35;stop-opacity:1" />
+                                        <stop offset="80%" style="stop-color:#ffd700;stop-opacity:1" />
+                                        <stop offset="100%" style="stop-color:#87ceeb;stop-opacity:1" />
+                                    </linearGradient>
+                                </defs>
+                                
+                                <path class="temp-area" d="M 0,80 Q 100,70 150,60 T 300,30 T 450,25 T 600,40 T 750,60 L 800,60 L 800,120 L 0,120 Z"/>
+                                <path class="temp-curve" d="M 0,80 Q 100,70 150,60 T 300,30 T 450,25 T 600,40 T 750,60 L 800,60"/>
+                            </svg>
+                            
+                            <div class="rain-drops">
+                                <div class="rain-drop"></div>
+                                <div class="rain-drop"></div>
+                                <div class="rain-drop"></div>
+                                <div class="rain-drop"></div>
+                                <div class="rain-drop"></div>
+                                <div class="rain-drop"></div>
+                                <div class="rain-drop"></div>
+                                <div class="rain-drop"></div>
+                                <div class="rain-drop"></div>
+                                <div class="rain-drop"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="sun-times">
+                            <div class="sun-time">
+                                <div class="sun-icon">☀️</div>
+                                <span>${data.sunrise}</span>
+                            </div>
+                            <div class="sun-time">
+                                <div class="sun-icon">☀️</div>
+                                <span>${data.sunset}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rain-probability">
+                        ${rainItems}
+                    </div>
+                </div>
+            `;
+            
+            // Add toggle functionality after rendering
+            setTimeout(() => {
+                const toggleSwitch = document.querySelector('.hourly-card .toggle-switch');
+                if (toggleSwitch) {
+                    toggleSwitch.addEventListener('click', () => {
+                        toggleSwitch.classList.toggle('active');
+                    });
+                }
+                
+                // Animate temperature curve
+                const curve = document.querySelector('.hourly-card .temp-curve');
+                const area = document.querySelector('.hourly-card .temp-area');
+                
+                if (curve && area) {
+                    const pathLength = curve.getTotalLength();
+                    curve.style.strokeDasharray = pathLength;
+                    curve.style.strokeDashoffset = pathLength;
+                    
+                    curve.style.transition = 'stroke-dashoffset 2s ease-in-out';
+                    curve.style.strokeDashoffset = '0';
+                    
+                    area.style.opacity = '0';
+                    area.style.transition = 'opacity 1s ease-in-out';
+                    setTimeout(() => {
+                        area.style.opacity = '0.3';
+                    }, 1000);
+                }
+            }, 100);
+            
+            return html;
+        }
+
+        // Card mapping
+        const cardTypes = {
+            'current': createCurrentCard,
+            'temperature': createTemperatureCard,
+            'feels-like': createFeelsLikeCard,
+            'cloud-cover': createCloudCoverCard,
+            'precipitation': createPrecipitationCard,
+            'wind': createWindCard,
+            'humidity': createHumidityCard,
+            'uv': createUVCard,
+            'aqi': createAQICard,
+            'visibility': createVisibilityCard,
+            'pressure': createPressureCard,
+            'sun': createSunCard,
+            'moon': createMoonCard,
+            'hourly': createHourlyCard
+        };
+
+        // Card order for navigation
+        const cardOrder = [
+            'current', 'temperature', 'feels-like', 'cloud-cover', 'precipitation', 
+            'wind', 'humidity', 'uv', 'aqi', 'visibility', 'pressure', 'sun', 'moon', 'hourly'
+        ];
+
+        let currentCardIndex = 0;
+
+        // Navigation function
+        function navigateCard(direction) {
+            console.log('Navigating:', direction, 'from index:', currentCardIndex);
+            
+            if (direction === 'next') {
+                currentCardIndex = (currentCardIndex + 1) % cardOrder.length;
+            } else if (direction === 'prev') {
+                currentCardIndex = (currentCardIndex - 1 + cardOrder.length) % cardOrder.length;
+            }
+            
+            const newCardType = cardOrder[currentCardIndex];
+            console.log('New card type:', newCardType, 'at index:', currentCardIndex);
+            
+            // Update URL without page reload
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.set('card', newCardType);
+            window.history.pushState({}, '', newUrl);
+            
+            // Update the card display
+            displayCard(newCardType);
+            updateCardCounter();
+        }
+
+        // Update card counter display
+        function updateCardCounter() {
+            const counterElement = document.getElementById('cardCounter');
+            if (counterElement) {
+                const counterText = `${currentCardIndex + 1} / ${cardOrder.length}`;
+                counterElement.textContent = counterText;
+                console.log('Card counter updated to:', counterText, 'Current card:', cardOrder[currentCardIndex]);
+            } else {
+                console.error('Card counter element not found');
+            }
+        }
+
+        // Update gradient background based on card type
+        function updateGradientBackground(cardType) {
+            const gradientBg = document.getElementById('gradientBg');
+            
+            console.log('Updating gradient background for card type:', cardType);
+            
+            // Remove all existing card type classes
+            const cardTypeClasses = Object.keys(cardTypes);
+            cardTypeClasses.forEach(type => {
+                gradientBg.classList.remove(type);
+            });
+            
+            // Add the new card type class
+            gradientBg.classList.add(cardType);
+            
+            console.log('Gradient background updated to:', cardType);
+        }
+
+        // Display specific card
+        function displayCard(cardType) {
+            const cardContentElement = document.getElementById('cardContent');
+            const cardElement = document.getElementById('weatherCard');
+            
+            console.log('Displaying card type:', cardType);
+            
+            // Update gradient background
+            updateGradientBackground(cardType);
+            
+            // Remove all existing card type classes
+            const cardTypeClasses = Object.keys(cardTypes);
+            cardTypeClasses.forEach(type => {
+                cardElement.classList.remove(`${type}-card`);
+            });
+            
+            // Add the specific card type class
+            cardElement.classList.add(`${cardType}-card`);
+            
+            console.log('Added card class:', `${cardType}-card`);
+            
+            if (cardTypes[cardType]) {
+                cardContentElement.innerHTML = cardTypes[cardType]();
+            } else {
+                cardContentElement.innerHTML = `
+                    <div class="card-header">
+                        <div class="card-icon">❓</div>
+                        <div class="card-title">Unknown Card</div>
+                    </div>
+                    <div style="text-align: center; margin-top: 50px;">
+                        <p>Card type "${cardType}" not found.</p>
+                        <p style="margin-top: 20px; font-size: 14px; opacity: 0.7;">
+                            Available cards: ${Object.keys(cardTypes).join(', ')}
+                        </p>
+                    </div>
+                `;
+            }
+        }
+
+        // Keyboard navigation
+        function handleKeyPress(event) {
+            console.log('Key pressed:', event.key);
+            
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                navigateCard('prev');
+            } else if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                navigateCard('next');
+            }
+        }
+
+        // Initialize the card based on URL parameter
+        async function initializeCard() {
+            let cardType = getUrlParameter('card') || 'current';
+            
+            console.log('Initializing card type:', cardType);
+            
+            // If no card parameter is provided, redirect to current card URL
+            if (!getUrlParameter('card')) {
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('card', 'current');
+                window.history.replaceState({}, '', newUrl);
+                console.log('No card parameter found, redirected to current card');
+            }
+            
+            // Try to load real weather data first
+            await loadWeatherData();
+            
+            // Set current card index based on URL parameter
+            currentCardIndex = cardOrder.indexOf(cardType);
+            if (currentCardIndex === -1) {
+                currentCardIndex = 0; // Default to first card if not found
+                cardType = cardOrder[0]; // Use first card in order
+            }
+            
+            console.log('Card type:', cardType, 'Index:', currentCardIndex);
+            
+            // Display the card
+            displayCard(cardType);
+            updateCardCounter();
+            
+            // Add keyboard event listener
+            document.addEventListener('keydown', handleKeyPress);
+            
+            console.log('Card initialized. Current index:', currentCardIndex, 'Card type:', cardType);
+        }
+
+        // Interactive gradient mouse movement effect
+        function initializeInteractiveGradient() {
+            const gradientBg = document.getElementById('gradientBg');
+            const orbs = gradientBg.querySelectorAll('.gradient-orb');
+            
+            let mouseX = 0;
+            let mouseY = 0;
+            let targetX = 0;
+            let targetY = 0;
+            
+            // Smooth mouse following animation with faster response
+            function animateOrbs() {
+                targetX += (mouseX - targetX) * 0.08;
+                targetY += (mouseY - targetY) * 0.08;
+                
+                orbs.forEach((orb, index) => {
+                    const speed = (index + 1) * 0.05;
+                    const offsetX = targetX * speed;
+                    const offsetY = targetY * speed;
+                    
+                    orb.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+                });
+                
+                requestAnimationFrame(animateOrbs);
+            }
+            
+            // Mouse move event listener with increased sensitivity
+            document.addEventListener('mousemove', (e) => {
+                mouseX = (e.clientX - window.innerWidth / 2) * 0.5;
+                mouseY = (e.clientY - window.innerHeight / 2) * 0.5;
+            });
+            
+            // Start animation
+            animateOrbs();
+            
+            console.log('Enhanced interactive gradient system initialized');
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeChartDefaults();
+            initializeCard();
+            initializeInteractiveGradient();
+        });
+
+        // Initialize Chart.js with white text defaults
+        function initializeChartDefaults() {
+            if (typeof Chart !== 'undefined') {
+                console.log('Setting Chart.js defaults to white text');
+                
+                // Set global defaults
+                Chart.defaults.color = 'white';
+                Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
+                Chart.defaults.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                
+                // Set plugin defaults
+                if (Chart.defaults.plugins) {
+                    if (Chart.defaults.plugins.legend) {
+                        Chart.defaults.plugins.legend.labels = Chart.defaults.plugins.legend.labels || {};
+                        Chart.defaults.plugins.legend.labels.color = 'white';
+                    }
+                    if (Chart.defaults.plugins.tooltip) {
+                        Chart.defaults.plugins.tooltip.titleColor = 'white';
+                        Chart.defaults.plugins.tooltip.bodyColor = 'white';
+                        Chart.defaults.plugins.tooltip.footerColor = 'white';
+                    }
+                }
+                
+                // Set scale defaults
+                if (Chart.defaults.scales) {
+                    // Linear scale defaults
+                    if (Chart.defaults.scales.linear) {
+                        Chart.defaults.scales.linear.ticks = Chart.defaults.scales.linear.ticks || {};
+                        Chart.defaults.scales.linear.ticks.color = 'white';
+                        Chart.defaults.scales.linear.grid = Chart.defaults.scales.linear.grid || {};
+                        Chart.defaults.scales.linear.grid.color = 'rgba(255, 255, 255, 0.1)';
+                        Chart.defaults.scales.linear.title = Chart.defaults.scales.linear.title || {};
+                        Chart.defaults.scales.linear.title.color = 'white';
+                    }
+                    
+                    // Category scale defaults
+                    if (Chart.defaults.scales.category) {
+                        Chart.defaults.scales.category.ticks = Chart.defaults.scales.category.ticks || {};
+                        Chart.defaults.scales.category.ticks.color = 'white';
+                        Chart.defaults.scales.category.grid = Chart.defaults.scales.category.grid || {};
+                        Chart.defaults.scales.category.grid.color = 'rgba(255, 255, 255, 0.1)';
+                        Chart.defaults.scales.category.title = Chart.defaults.scales.category.title || {};
+                        Chart.defaults.scales.category.title.color = 'white';
+                    }
+                }
+                
+                console.log('Chart.js defaults set to white text');
+            } else {
+                console.warn('Chart.js not loaded yet, retrying in 100ms');
+                setTimeout(initializeChartDefaults, 100);
+            }
+        }
+
+        function getUrlParameter(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+    </script>
+</body>
+</html> 

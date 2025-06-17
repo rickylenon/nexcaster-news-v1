@@ -3,12 +3,12 @@
 Weather Card Recorder - Step 5
 
 Captures weather card visualizations from the Flask weather cards interface
-and generates uniform WebM videos for multimedia composition.
+and generates uniform WebM videos for media composition.
 
 This module integrates with:
 - weather_cards.html served via Flask app
 - constants.py for card definitions
-- Real-time weather data from /api/weather/latest
+- Real-time weather data from /api/weather/generated
 - Centralized configuration from config.py
 
 Features:
@@ -18,14 +18,14 @@ Features:
 - Simplified capture without external dependencies
 - Progress tracking and error handling
 - Configurable video duration and quality
-- Defaults to data/latest/multimedia output directory
+- Defaults to generated/media output directory
 
 Usage:
     # Basic capture of all weather cards
     python step5_card_recorder.py
     
     # Custom job ID and Flask server
-    python step5_card_recorder.py --job-id "weather_20250127" --flask-url "http://localhost:5001"
+    python step5_card_recorder.py --job-id "weather_20250127" --flask-url "http://localhost:5002"
     
     # Custom video duration and quality
     python step5_card_recorder.py --video-duration 8 --video-fps 30
@@ -80,14 +80,14 @@ WEATHER_CARD_DESCRIPTIONS = {k: v for k, v in WEATHER_MEDIA_DESCRIPTIONS.items()
 print(f"[CARD_RECORDER] Loaded {len(WEATHER_CARD_DESCRIPTIONS)} weather card types from constants")
 
 class WeatherCardRecorder:
-    """Captures weather card videos from Flask interface for multimedia composition"""
+    """Captures weather card videos from Flask interface for media composition"""
     
     def __init__(self, 
                  flask_url: str = None,
                  viewport_size: Tuple[int, int] = None,
                  video_fps: int = None,
-                 job_id: str = "latest",
-                 use_latest_manager: bool = True):
+                 job_id: str = "generated",
+                 use_generated_manager: bool = True):
         """
         Initialize weather card recorder system with config defaults
         
@@ -96,10 +96,10 @@ class WeatherCardRecorder:
             viewport_size: Video viewport dimensions (width, height) (uses config default)
             video_fps: Video frame rate (uses config default)
             job_id: Job ID for file organization
-            use_latest_manager: Whether to use LatestMediaManager for automatic organization
+            use_generated_manager: Whether to use LatestMediaManager for automatic organization
         """
         # Use configuration defaults
-        self.flask_url = flask_url or getattr(config, 'DEFAULT_FLASK_URL', "http://localhost:5001")
+        self.flask_url = flask_url or getattr(config, 'DEFAULT_FLASK_URL', "http://localhost:5002")
         viewport_size = viewport_size or getattr(config, 'DEFAULT_CARD_VIEWPORT', (1200, 800))
         self.viewport_width, self.viewport_height = viewport_size
         self.video_fps = video_fps or getattr(config, 'DEFAULT_CARD_FPS', 30)
@@ -111,9 +111,9 @@ class WeatherCardRecorder:
         print(f"[CARD_RECORDER] Video FPS: {self.video_fps}")
         
         # Set output directory - use config defaults
-        self.output_dir = Path(getattr(config, 'DEFAULT_CARD_OUTPUT_DIR', 'data/latest/multimedia'))
-        if job_id != "latest":
-            self.output_dir = Path(f"data/{job_id}/multimedia")
+        self.output_dir = Path(getattr(config, 'DEFAULT_CARD_OUTPUT_DIR', 'generated/media'))
+        if job_id != "generated":
+            self.output_dir = Path(f"generated{job_id}/media")
         
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
@@ -154,7 +154,7 @@ class WeatherCardRecorder:
         
         # Map card-* format to URL parameter format
         url_param = card_key.replace('card-', '')
-        url = f"{self.flask_url}/?card={url_param}&data=api/weather/latest"
+        url = f"{self.flask_url}/?card={url_param}&data=api/weather/generated"
         return url
     
     def get_card_filename(self, card_key: str) -> str:
@@ -422,7 +422,7 @@ async def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Capture all weather cards to data/latest/multimedia (default)
+  # Capture all weather cards to generated/media (default)
   python step5_card_recorder.py
 
   # Capture with custom job ID
@@ -438,28 +438,28 @@ Examples:
   python step5_card_recorder.py --debug
 
   # Custom Flask server URL
-  python step5_card_recorder.py --flask-url "http://192.168.1.100:5001"
+  python step5_card_recorder.py --flask-url "http://192.168.1.100:5002"
         """
     )
     
     parser.add_argument(
         '--flask-url',
-        help=f'URL of the Flask weather cards interface (default from config: {getattr(config, "DEFAULT_FLASK_URL", "http://localhost:5001")})'
+        help=f'URL of the Flask weather cards interface (default from config: {getattr(config, "DEFAULT_FLASK_URL", "http://localhost:5002")})'
     )
     
     parser.add_argument(
         '--job-id', 
-        default='latest',
-        help='Job ID for file organization (default: latest - saves to data/latest/multimedia)'
+        default='generated',
+        help='Job ID for file organization (default: generated - saves to generated/media)'
     )
     
     parser.add_argument(
         '--output', 
-        help='Output directory name (overrides --job-id, disables latest manager)'
+        help='Output directory name (overrides --job-id, disables generated manager)'
     )
     
     parser.add_argument(
-        '--no-latest',
+        '--no-generated',
         action='store_true',
         help='Disable LatestMediaManager integration'
     )
@@ -514,8 +514,8 @@ Examples:
     
     args = parser.parse_args()
     
-    # Handle output parameter and latest manager settings
-    use_latest_manager = not args.no_latest and not args.output
+    # Handle output parameter and generated manager settings
+    use_generated_manager = not args.no_generated and not args.output
     job_id = args.output if args.output else args.job_id
     
     # Build viewport size from args or config defaults
@@ -529,7 +529,7 @@ Examples:
         viewport_size=(viewport_width, viewport_height),
         video_fps=args.video_fps,
         job_id=job_id,
-        use_latest_manager=use_latest_manager
+        use_generated_manager=use_generated_manager
     )
     
     # List cards and exit if requested

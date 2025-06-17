@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Step 3: Weather TTS (Text-to-Speech) Generator
-This script generates audio files from weather_scripts.json using OpenAI TTS
+This script generates audio files from weather_scripts.json using configurable TTS providers
 """
 
 import os
@@ -9,6 +9,7 @@ import json
 import openai
 from pathlib import Path
 from datetime import datetime
+from google.cloud import texttospeech
 from pydub import AudioSegment
 from dotenv import load_dotenv
 from config import TTS_CONFIG, LANGUAGE, OPENAI_API_KEY
@@ -22,9 +23,35 @@ if "/opt/homebrew/bin" not in os.environ.get("PATH", ""):
     os.environ["PATH"] = f"/opt/homebrew/bin:/usr/local/bin:{os.environ.get('PATH', '')}"
     print(f"Added Homebrew paths to PATH for ffmpeg access")
 
-print(f"Using OpenAI Text-to-Speech API")
+# Print TTS configuration
 print(f"TTS Provider: {TTS_CONFIG['provider']}")
 print(f"Language: {LANGUAGE}")
+
+# Import and configure providers based on TTS_CONFIG
+if TTS_CONFIG['provider'] == 'elevenlabs':
+    try:
+        from elevenlabs.client import ElevenLabs
+        from elevenlabs import VoiceSettings
+        print(f"Using ElevenLabs Text-to-Speech API")
+    except ImportError:
+        print("Error: ElevenLabs library not installed. Install with: pip install elevenlabs")
+        exit(1)
+elif TTS_CONFIG['provider'] == 'openai':
+    print(f"Using OpenAI Text-to-Speech API")
+elif TTS_CONFIG['provider'] == 'google':
+    print(f"Using Google Cloud Text-to-Speech API")
+    
+    # Set up Google Cloud credentials if needed
+    credentials_file = "../promising-cairn-283201-f7bb9e4c5c4f.json"
+    if os.path.exists(credentials_file):
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath(credentials_file)
+        print(f"Google Cloud credentials set: {os.path.abspath(credentials_file)}")
+    elif "GOOGLE_APPLICATION_CREDENTIALS" not in os.environ:
+        print("Warning: GOOGLE_APPLICATION_CREDENTIALS environment variable not set!")
+        print("Please set it manually or place the credentials file in the project directory.")
+else:
+    print(f"Error: Unsupported TTS provider: {TTS_CONFIG['provider']}")
+    exit(1)
 
 def load_weather_scripts():
     """Load weather scripts from generated/weather_scripts.json"""
@@ -133,6 +160,165 @@ def preprocess_script_for_tts(script_text, language):
     
     return processed_text
 
+def generate_audio_with_elevenlabs_tts(segment, output_dir):
+    """Generate audio file using ElevenLabs Text-to-Speech"""
+    print(f"Generating audio with ElevenLabs TTS for: {segment['display_name']}")
+    print(f"Language: {LANGUAGE}")
+    print(f"Script length: {len(segment['script'])} characters")
+    
+    # Create audio output directory
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Output filename - use unique identifier to avoid overwriting
+    segment_id = f"{segment['segment_type']}_{segment.get('display_order', 0)}"
+    audio_filename = f"{segment_id}.mp3"
+    audio_path = os.path.join(output_dir, audio_filename)
+    
+    try:
+        # Get API key
+        api_key = os.environ.get("ELEVEN_API_KEY")
+        if not api_key:
+            raise Exception("ELEVEN_API_KEY environment variable not set!")
+        
+        # Preprocess script for better TTS pronunciation
+        processed_script = preprocess_script_for_tts(segment["script"], LANGUAGE)
+        print(f"Preprocessed script: {processed_script[:100]}..." if len(processed_script) > 100 else processed_script)
+        
+        # Initialize ElevenLabs client
+        client = ElevenLabs(api_key=api_key)
+        
+        # Configure voice settings
+        voice_settings = VoiceSettings(
+            stability=TTS_CONFIG["elevenlabs"]["voice_settings"]["stability"],
+            similarity_boost=TTS_CONFIG["elevenlabs"]["voice_settings"]["similarity_boost"],
+            style=TTS_CONFIG["elevenlabs"]["voice_settings"]["style"],
+            use_speaker_boost=TTS_CONFIG["elevenlabs"]["voice_settings"]["use_speaker_boost"]
+        )
+        
+        print(f"Using voice ID: {TTS_CONFIG['elevenlabs']['voice_id']}")
+        print(f"Using model: {TTS_CONFIG['elevenlabs']['model_id']}")
+        
+        # Generate the speech using the correct API
+        audio_data = client.text_to_speech.convert(
+            text=processed_script,
+            voice_id=TTS_CONFIG["elevenlabs"]["voice_id"],
+            model_id=TTS_CONFIG["elevenlabs"]["model_id"],
+            voice_settings=voice_settings,
+            output_format=TTS_CONFIG["elevenlabs"]["output_format"]
+        )
+        
+        # Save audio file
+        with open(audio_path, "wb") as f:
+            # audio_data is a generator, so we need to iterate through it
+            for chunk in audio_data:
+                f.write(chunk)
+        
+        print(f"Audio saved: {audio_path}")
+        
+        # Measure actual duration of generated audio file
+        try:
+            audio_segment = AudioSegment.from_file(audio_path)
+            actual_duration = len(audio_segment) / 1000.0  # Convert to seconds
+            print(f"Measured actual duration: {actual_duration:.3f}s (estimated: {segment['duration']}s)")
+        except Exception as e:
+            print(f"Warning: Could not measure audio duration: {e}")
+            actual_duration = segment["duration"]  # Fallback to estimated
+        
+        return {
+            "segment_type": segment["segment_type"],
+            "display_name": segment["display_name"],
+            "audio_file": audio_filename,
+            "audio_path": audio_path,
+            "script": segment["script"],
+            "headline": segment.get("headline", ""),
+            "duration": round(actual_duration, 3),
+            "language": LANGUAGE,
+            "voice_used": TTS_CONFIG["elevenlabs"]["voice_id"],
+            "tts_service": "ElevenLabs"
+        }
+        
+    except Exception as e:
+        print(f"Error generating audio with ElevenLabs TTS for {segment['segment_type']}: {e}")
+        return None
+
+def generate_audio_with_google_tts(segment, output_dir):
+    """Generate audio file using Google Cloud Text-to-Speech"""
+    print(f"Generating audio with Google TTS for: {segment['display_name']}")
+    print(f"Language: {LANGUAGE}")
+    print(f"Script length: {len(segment['script'])} characters")
+    
+    # Create audio output directory
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Output filename - use unique identifier to avoid overwriting
+    segment_id = f"{segment['segment_type']}_{segment.get('display_order', 0)}"
+    audio_filename = f"{segment_id}.{TTS_CONFIG['google']['output_format']}"
+    audio_path = os.path.join(output_dir, audio_filename)
+    
+    try:
+        # Preprocess script for better TTS pronunciation
+        processed_script = preprocess_script_for_tts(segment["script"], LANGUAGE)
+        print(f"Preprocessed script: {processed_script[:100]}..." if len(processed_script) > 100 else processed_script)
+        
+        # Initialize Google Cloud TTS client
+        client = texttospeech.TextToSpeechClient()
+        
+        # Configure the text input
+        synthesis_input = texttospeech.SynthesisInput(text=processed_script)
+        
+        # Configure the voice parameters
+        voice = texttospeech.VoiceSelectionParams(
+            language_code=TTS_CONFIG["google"]["language_code"],
+            name=TTS_CONFIG["google"]["voice_name"],
+            ssml_gender=getattr(texttospeech.SsmlVoiceGender, TTS_CONFIG["google"]["voice_gender"])
+        )
+        
+        # Configure the audio output
+        audio_config = texttospeech.AudioConfig(
+            audio_encoding=getattr(texttospeech.AudioEncoding, TTS_CONFIG["google"]["audio_encoding"]),
+            speaking_rate=TTS_CONFIG["google"]["speaking_rate"],
+            pitch=TTS_CONFIG["google"]["pitch"]
+        )
+        
+        # Generate the speech
+        response = client.synthesize_speech(
+            input=synthesis_input, 
+            voice=voice, 
+            audio_config=audio_config
+        )
+        
+        # Save audio file
+        with open(audio_path, "wb") as out:
+            out.write(response.audio_content)
+        
+        print(f"Audio saved: {audio_path}")
+        
+        # Measure actual duration of generated audio file
+        try:
+            audio_segment = AudioSegment.from_file(audio_path)
+            actual_duration = len(audio_segment) / 1000.0  # Convert to seconds
+            print(f"Measured actual duration: {actual_duration:.3f}s (estimated: {segment['duration']}s)")
+        except Exception as e:
+            print(f"Warning: Could not measure audio duration: {e}")
+            actual_duration = segment["duration"]  # Fallback to estimated
+        
+        return {
+            "segment_type": segment["segment_type"],
+            "display_name": segment["display_name"],
+            "audio_file": audio_filename,
+            "audio_path": audio_path,
+            "script": segment["script"],
+            "headline": segment.get("headline", ""),
+            "duration": round(actual_duration, 3),
+            "language": LANGUAGE,
+            "voice_used": TTS_CONFIG["google"]["voice_name"],
+            "tts_service": "Google Cloud"
+        }
+        
+    except Exception as e:
+        print(f"Error generating audio with Google TTS for {segment['segment_type']}: {e}")
+        return None
+
 def generate_audio_with_openai_tts(segment, output_dir):
     """Generate audio file using OpenAI Text-to-Speech"""
     print(f"Generating audio with OpenAI TTS for: {segment['display_name']}")
@@ -163,7 +349,7 @@ def generate_audio_with_openai_tts(segment, output_dir):
         # OpenAI TTS API call
         client = openai.OpenAI(api_key=OPENAI_API_KEY)
         response = client.audio.speech.create(
-            model="tts-1-hd",
+            model=TTS_CONFIG["openai"]["model"],
             voice=voice,
             input=processed_script,
             speed=TTS_CONFIG["openai"]["speed"]
@@ -197,6 +383,18 @@ def generate_audio_with_openai_tts(segment, output_dir):
         
     except Exception as e:
         print(f"Error generating audio with OpenAI TTS for {segment['segment_type']}: {e}")
+        return None
+
+def generate_audio_segment(segment, output_dir):
+    """Generate audio segment using the configured TTS provider"""
+    if TTS_CONFIG['provider'] == 'elevenlabs':
+        return generate_audio_with_elevenlabs_tts(segment, output_dir)
+    elif TTS_CONFIG['provider'] == 'openai':
+        return generate_audio_with_openai_tts(segment, output_dir)
+    elif TTS_CONFIG['provider'] == 'google':
+        return generate_audio_with_google_tts(segment, output_dir)
+    else:
+        print(f"Error: Unsupported TTS provider: {TTS_CONFIG['provider']}")
         return None
 
 def combine_audio_segments(audio_results, output_dir):
@@ -296,10 +494,10 @@ def main():
         print("Step 3: Combining existing weather audio files (SKIP GENERATION)")
     else:
         print("Step 3: Generating audio from weather scripts")
-    print(f"TTS Service: OpenAI")
+    print(f"TTS Service: {TTS_CONFIG['provider']}")
     print(f"Language: {LANGUAGE}")
-    print(f"Voice: {TTS_CONFIG['openai']['voice']}")
-    print(f"Speed: {TTS_CONFIG['openai']['speed']}")
+    print(f"Voice: {TTS_CONFIG['openai']['voice'] if TTS_CONFIG['provider'] == 'openai' else TTS_CONFIG['elevenlabs']['voice_id']}")
+    print(f"Speed: {TTS_CONFIG['openai']['speed'] if TTS_CONFIG['provider'] == 'openai' else TTS_CONFIG['elevenlabs']['voice_settings']['similarity_boost']}")
     print(f"Output format: mp3")
     print()
     
@@ -342,14 +540,14 @@ def main():
                     "headline": segment.get("headline", ""),
                     "duration": round(actual_duration, 3),
                     "language": LANGUAGE,
-                    "voice_used": TTS_CONFIG["openai"]["voice"],
-                    "tts_service": "OpenAI"
+                    "voice_used": TTS_CONFIG['openai']['voice'] if TTS_CONFIG['provider'] == 'openai' else TTS_CONFIG['elevenlabs']['voice_id'],
+                    "tts_service": TTS_CONFIG['provider']
                 })
             else:
                 print(f"  ❌ Missing: {audio_filename}")
     else:
         for segment in scripts:
-            result = generate_audio_with_openai_tts(segment, audio_dir)
+            result = generate_audio_segment(segment, audio_dir)
             if result:
                 audio_results.append(result)
     
@@ -390,14 +588,14 @@ def main():
         "individual_segments": updated_audio_results,
         "combined_audio": combined_result,
         "generation_info": {
-            "tts_service": "OpenAI",
+            "tts_service": TTS_CONFIG['provider'],
             "language": LANGUAGE,
             "total_segments": len(updated_audio_results),
             "total_duration": round(cumulative_time, 3),
             "timestamp": datetime.now().isoformat(),
             "content_type": "weather_forecast",
-            "voice_used": TTS_CONFIG["openai"]["voice"],
-            "speed": TTS_CONFIG["openai"]["speed"]
+            "voice_used": TTS_CONFIG['openai']['voice'] if TTS_CONFIG['provider'] == 'openai' else TTS_CONFIG['elevenlabs']['voice_id'],
+            "speed": TTS_CONFIG['openai']['speed'] if TTS_CONFIG['provider'] == 'openai' else TTS_CONFIG['elevenlabs']['voice_settings']['similarity_boost']
         }
     }
     

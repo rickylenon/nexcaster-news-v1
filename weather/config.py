@@ -57,6 +57,10 @@ MAX_VIDEOS_STORED = int(os.getenv('MAX_VIDEOS_STORED', '50'))
 CLEANUP_OLD_VIDEOS = os.getenv('CLEANUP_OLD_VIDEOS', 'True').lower() == 'true'
 VIDEO_RETENTION_DAYS = int(os.getenv('VIDEO_RETENTION_DAYS', '30'))
 
+# Script Generation Settings
+BRIEF_MODE = os.getenv('BRIEF_MODE', 'True').lower() == 'true'
+INCLUDE_VIDEO_SEGMENTS = os.getenv('INCLUDE_VIDEO_SEGMENTS', 'False').lower() == 'true'
+
 # Scraping Configuration
 SCRAPING = {
     "default_source": os.getenv('DEFAULT_SCRAPING_SOURCE', 'worldweatheronline'),
@@ -325,7 +329,7 @@ AI_CONFIG = {
 
 # Text-to-Speech Configuration (Enhanced with news-style options)
 TTS_CONFIG = {
-    "provider": os.getenv("TTS_PROVIDER", "openai"),  # Options: "openai", "elevenlabs", "google"
+    "provider": os.getenv("TTS_PROVIDER", "google"),  # Options: "openai", "elevenlabs", "google"
     "openai": {
         "voice": os.getenv("TTS_OPENAI_VOICE", "alloy"),  # alloy works well with Filipino
         "speed": float(os.getenv("TTS_OPENAI_SPEED", "0.9")),  # Slightly slower for Filipino clarity
@@ -345,8 +349,8 @@ TTS_CONFIG = {
         "chunk_length_schedule": [120, 160, 250, 370],  # Text chunk sizes for longer texts
     },
     "google": {
-        "language_code": os.getenv("TTS_GOOGLE_LANG", "en-US"),  # fil-PH for Filipino
-        "voice_name": os.getenv("TTS_GOOGLE_VOICE", "en-US-Chirp3-HD-Achernar"),  # fil-PH-Standard-A for Filipino
+        "language_code": os.getenv("TTS_GOOGLE_LANG", "fil-PH"),  # fil-PH for Filipino, en-US
+        "voice_name": os.getenv("TTS_GOOGLE_VOICE", "fil-PH-Standard-A"),  # fil-PH-Standard-A for Filipino, en-US-Chirp3-HD-Achernar EN
         "voice_gender": os.getenv("TTS_GOOGLE_GENDER", "FEMALE"),
         "speaking_rate": float(os.getenv("TTS_GOOGLE_RATE", "0.9")),  # Slightly slower for clarity
         "pitch": float(os.getenv("TTS_GOOGLE_PITCH", "0.0")),  # Normal pitch
@@ -357,6 +361,7 @@ TTS_CONFIG = {
     "sample_rate": int(os.getenv("TTS_SAMPLE_RATE", "24000")),
     "use_replacements": os.getenv("TTS_USE_REPLACEMENTS", "True").lower() == 'true',
 }
+print(f"TTS_CONFIG: {TTS_CONFIG}")
 
 # Visual Assets Configuration
 VISUAL_CONFIG = {
@@ -432,44 +437,7 @@ WEB_CONFIG = {
     "thumbnail_size": (320, 180),
 }
 
-# Segment Types Configuration
-SEGMENT_TYPES = [
-    {
-        "name": "intro",
-        "display_name": "Introduction",
-        "required": True,
-        "position": "beginning",
-        "description": "An introduction to the weather report",
-    },
-    {
-        "name": "current_conditions",
-        "display_name": "Current Conditions",
-        "required": True,
-        "position": "middle",
-        "description": "Current weather conditions",
-    },
-    {
-        "name": "forecast",
-        "display_name": "Forecast",
-        "required": True,
-        "position": "middle",
-        "description": "Weather forecast for coming days",
-    },
-    {
-        "name": "radar",
-        "display_name": "Radar Images",
-        "required": False,
-        "position": "middle",
-        "description": "Weather radar images showing precipitation",
-    },
-    {
-        "name": "outro",
-        "display_name": "Conclusion",
-        "required": True,
-        "position": "end",
-        "description": "Conclusion of the weather report",
-    },
-]
+# Legacy segment types removed - now using media-based script types from constants.py
 
 # Function to validate the configuration
 def validate_config() -> List[str]:
@@ -524,7 +492,6 @@ def get_all_config() -> Dict[str, Any]:
         "STORAGE_CONFIG": STORAGE_CONFIG,
         "JOB_QUEUE_CONFIG": JOB_QUEUE_CONFIG,
         "WEB_CONFIG": WEB_CONFIG,
-        "SEGMENT_TYPES": SEGMENT_TYPES,
         # Weather Scraping Defaults for direct access
         "DEFAULT_WEATHER_URL": SCRAPING["weather_defaults"]["url"],
         "DEFAULT_MUNICIPALITY": SCRAPING["weather_defaults"]["location"]["municipality"],

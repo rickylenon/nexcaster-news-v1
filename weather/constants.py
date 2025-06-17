@@ -58,8 +58,13 @@ def get_description(media_key: str) -> str:
 AVAILABLE_MEDIA = list(WEATHER_MEDIA_DESCRIPTIONS.keys())
 
 # Generate script types from weather media descriptions
-def generate_script_types_from_media():
-    """Generate simplified script types based on weather media descriptions"""
+def generate_script_types_from_media(include_video_segments=False, brief_mode=False):
+    """Generate simplified script types based on weather media descriptions
+    
+    Args:
+        include_video_segments (bool): Whether to include intro.mp4 and outro.mp4
+        brief_mode (bool): Whether to use shorter durations for brief scripts
+    """
     script_types = []
     display_order = 100  # Start from 100 to allow insertions
     
@@ -111,9 +116,33 @@ def generate_script_types_from_media():
         'weather_current_overview': 30.0
     }
     
+    # Brief mode durations (shorter for quick updates)
+    BRIEF_DURATION_MAP = {
+        'intro.mp4': 8.0,
+        'weather_map1': 15.0,
+        'weather_map2': 15.0,
+        'outro.mp4': 8.0,
+        'card-temperature': 15.0,
+        'card-feels-like': 12.0,
+        'card-cloud-cover': 12.0,
+        'card-precipitation': 15.0,
+        'card-wind': 12.0,
+        'card-humidity': 12.0,
+        'card-uv': 15.0,
+        'card-aqi': 18.0,
+        'card-visibility': 10.0,
+        'card-pressure': 12.0,
+        'card-sun': 10.0,
+        'card-moon': 10.0,
+        'card-current': 20.0,
+        'card-hourly': 25.0,
+        'weather_overview': 30.0,
+        'weather_current_overview': 18.0
+    }
+    
     for media_key, description in WEATHER_MEDIA_DESCRIPTIONS.items():
-        # Skip .mp4 files for now, they're video intros/outros
-        if media_key.endswith('.mp4'):
+        # Skip .mp4 files unless specifically requested
+        if media_key.endswith('.mp4') and not include_video_segments:
             continue
             
         # Create display name from media key
@@ -121,14 +150,18 @@ def generate_script_types_from_media():
         if display_name.startswith('Card '):
             display_name = display_name.replace('Card ', '')
         
+        # Choose duration map based on brief mode
+        duration_map = BRIEF_DURATION_MAP if brief_mode else DURATION_MAP
+        
         script_type = {
             'name': media_key.replace('-', '_'),
             'display_name': display_name,
             'display_order': display_order,
-            'target_duration': DURATION_MAP.get(media_key, 25.0),
+            'target_duration': duration_map.get(media_key, 15.0 if brief_mode else 25.0),
             'prompt_focus': description,
             'headline': FILIPINO_HEADLINES.get(media_key, 'Weather update para sa inyo.'),
-            'media_key': media_key
+            'media_key': media_key,
+            'brief_mode': brief_mode
         }
         
         script_types.append(script_type)
@@ -136,8 +169,14 @@ def generate_script_types_from_media():
     
     return script_types
 
-# Generate the script types
+# Generate the script types (default: no video segments, normal duration)
 MEDIA_BASED_SCRIPT_TYPES = generate_script_types_from_media()
+
+# Generate brief script types with video segments
+BRIEF_SCRIPT_TYPES_WITH_VIDEO = generate_script_types_from_media(include_video_segments=True, brief_mode=True)
+
+# Generate brief script types without video segments  
+BRIEF_SCRIPT_TYPES = generate_script_types_from_media(include_video_segments=False, brief_mode=True)
 
 if __name__ == "__main__":
     """Display all weather media descriptions and generated script types"""

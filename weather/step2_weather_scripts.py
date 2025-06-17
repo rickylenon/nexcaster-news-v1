@@ -69,6 +69,10 @@ class MunicipalWeatherScriptGenerator:
         self.scripts_dir = config.get('DATA_DIR', 'generated')
         os.makedirs(self.scripts_dir, exist_ok=True)
         
+        # Get script generation options from config
+        self.include_video_segments = config.get('INCLUDE_VIDEO_SEGMENTS', False)
+        self.brief_mode = config.get('BRIEF_MODE', True)
+        
         # Load media-based script types from constants
         self.script_types = self._get_media_based_script_types()
         
@@ -82,9 +86,16 @@ class MunicipalWeatherScriptGenerator:
     def _get_media_based_script_types(self) -> List[Dict[str, Any]]:
         """Load script types from constants.py media descriptions"""
         try:
-            from constants import MEDIA_BASED_SCRIPT_TYPES
-            logger.info(f"Loaded {len(MEDIA_BASED_SCRIPT_TYPES)} media-based script types")
-            return MEDIA_BASED_SCRIPT_TYPES
+            from constants import generate_script_types_from_media
+            
+            # Generate script types based on configuration
+            script_types = generate_script_types_from_media(
+                include_video_segments=self.include_video_segments,
+                brief_mode=self.brief_mode
+            )
+            
+            logger.info(f"Loaded {len(script_types)} media-based script types (video: {self.include_video_segments}, brief: {self.brief_mode})")
+            return script_types
         except ImportError:
             logger.warning("Could not import constants.py, using fallback script types")
             return self._get_fallback_script_types()
@@ -237,6 +248,24 @@ class MunicipalWeatherScriptGenerator:
     def _get_system_prompt(self) -> str:
         """System prompt for weather reporting"""
         language = self.config.get('LANGUAGE', 'English')
+        brief_instruction = ""
+        continuity_instruction = ""
+        
+        if self.brief_mode:
+            brief_instruction = "\n• CRITICAL: BRIEF MODE ACTIVE - Maximum 1-2 short sentences ONLY\n• Word limit: 25-40 words maximum per script\n• NO lengthy descriptions - stick to essentials only\n• Use quick, punchy delivery style\n• Focus on ONE key weather point per segment"
+        
+        # Add continuity instructions to avoid repetitive greetings
+        continuity_instruction = """
+• CRITICAL CONTINUITY RULES:
+  - This is ONE continuous weather report broken into segments
+  - DO NOT repeat "Sa Pulilan, Bulacan" in every segment
+  - ONLY the first segment gets a greeting and location
+  - Use transition words: "Samantala", "Tingnan naman", "Dagdag pa rito"
+  - Flow naturally like one person speaking continuously
+  - EXAMPLES:
+    * First segment: "Magandang araw, Pulilan! Kasalukuyang 31°C..."
+    * Next segments: "Samantala, ang humidity ay...", "Tingnan naman ang UV index...", "Dagdag pa rito, ang hangin ay..."
+  - NO repetitive introductions or location mentions"""
         
         if language.lower() == 'filipino':
             return f"""Ikaw ay isang propesyonal na TV weather reporter na nagbibigay ng malinaw at makabuluhang weather reports para sa lokal na audience.
@@ -246,12 +275,12 @@ Gumawa ng scripts sa Filipino na:
 • Gumagamit ng natural na Filipino weather terms
 • Professional ngunit friendly na tono
 • Naaayon sa weather media visual na ipapakita
-• May mga headline na nakakaakit ng pansin
+• May mga headline na nakakaakit ng pansin{brief_instruction}{continuity_instruction}
 
 Magbigay ng JSON response na may:
 {{
     "headline": "Nakakaakit na Filipino headline",
-    "script": "Detalyadong weather script sa Filipino"
+    "script": "{'Napakaikli at' if self.brief_mode else 'Detalyadong'} weather script sa Filipino"
 }}
 
 O kaya naman ay script text lang kung hindi kaya ang JSON format."""
@@ -263,12 +292,12 @@ Create scripts that are:
 • Using natural weather terminology in {language}
 • Professional yet friendly tone
 • Appropriate for the weather media visual being shown
-• Include engaging headlines
+• Include engaging headlines{brief_instruction}{continuity_instruction}
 
 Provide JSON response with:
 {{
     "headline": "Engaging headline in {language}",
-    "script": "Detailed weather script in {language}"
+    "script": "{'Very brief' if self.brief_mode else 'Detailed'} weather script in {language}"
 }}
 
 Or just provide the script text if JSON formatting is difficult."""
@@ -302,10 +331,36 @@ Or just provide the script text if JSON formatting is difficult."""
         language = self.config.get('LANGUAGE', 'English')
         language_instruction = "Generate in Filipino" if language.lower() == 'filipino' else f"Generate in {language}"
         
+        # Determine if this is the first script (lowest display_order)
+        is_first_script = script_type['display_order'] == 100
+        
+        # Add segment position context for continuity
+        segment_position = ""
+        if is_first_script:
+            segment_position = """
+SEGMENT POSITION: This is the OPENING segment - include a greeting to start the weather report.
+START EXAMPLE: "Magandang araw, Pulilan! Kasalukuyang..." 
+DO include greeting and location mention."""
+        else:
+            segment_position = f"""
+SEGMENT POSITION: This is CONTINUATION segment #{script_type['display_order']} - NO greeting or location needed.
+START EXAMPLES: 
+- "Samantala, ang {script_type['display_name'].lower()} ay..."
+- "Tingnan naman natin ang {script_type['display_name'].lower()}..."
+- "Dagdag pa rito, ang..."
+- "Sa banda namang..."
+DO NOT start with "Sa Pulilan, Bulacan" or any location mention.
+Flow naturally from the previous weather segment."""
+        
+        # Brief mode specific instructions
+        brief_mode_instruction = ""
+        if self.brief_mode:
+            brief_mode_instruction = f"\nBRIEF MODE: Target duration is only {script_type['target_duration']} seconds. Keep it extremely concise - maximum 25-40 words."
+        
         return f"""
 Create a weather script for: {script_type['display_name']}
 
-MEDIA FOCUS: {script_type['prompt_focus']}
+MEDIA FOCUS: {script_type['prompt_focus']}{segment_position}{brief_mode_instruction}
 
 WEATHER CONTEXT:
 Location: {weather_context['location']}, {weather_context['region']}
@@ -385,6 +440,10 @@ async def main():
                        help='Output directory for scripts (default: generated/)')
     parser.add_argument('--debug', action='store_true',
                        help='Enable debug logging')
+    parser.add_argument('--include-video', action='store_true',
+                       help='Include intro and outro video segments')
+    parser.add_argument('--brief', action='store_true',
+                       help='Generate brief, concise scripts with shorter durations')
     
     args = parser.parse_args()
     
@@ -428,13 +487,22 @@ async def main():
             'OPENAI_MODEL': DEFAULT_SEGMENT_MODEL,
             'OPENAI_TEMPERATURE': DEFAULT_SEGMENT_TEMPERATURE,
             'OPENAI_MAX_TOKENS': DEFAULT_SEGMENT_MAX_TOKENS,
-            'LANGUAGE': getattr(config, 'LANGUAGE', 'English')
+            'LANGUAGE': getattr(config, 'LANGUAGE', 'English'),
+            'INCLUDE_VIDEO_SEGMENTS': args.include_video if args.include_video else getattr(config, 'INCLUDE_VIDEO_SEGMENTS', False),
+            'BRIEF_MODE': args.brief if args.brief else getattr(config, 'BRIEF_MODE', True)
         }
         
         generator = MunicipalWeatherScriptGenerator(config_dict)
         
         # Generate scripts
-        print(f"🚀 Generating municipal weather scripts using {generator.openai_model}...")
+        mode_flags = []
+        if args.include_video:
+            mode_flags.append("📹 with video segments")
+        if args.brief:
+            mode_flags.append("⚡ brief mode")
+        mode_text = f" ({', '.join(mode_flags)})" if mode_flags else ""
+        
+        print(f"🚀 Generating municipal weather scripts using {generator.openai_model}{mode_text}...")
         scripts = await generator.generate_scripts(weather_data)
         
         if scripts:

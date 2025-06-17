@@ -1,0 +1,1724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexcaster Weather Media Player</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
+        }
+
+        .player-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.8;
+        }
+
+        .status-bar {
+            background: rgba(255,255,255,0.1);
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4CAF50;
+        }
+
+        .status-indicator.loading {
+            background: #ff9800;
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-indicator.error {
+            background: #f44336;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .video-stage {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 3 / 2; /* 3:2 ratio for 1200x800 videos */
+            max-height: 800px; /* Cap height for very wide screens */
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .main-video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .media-info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            max-width: 300px;
+        }
+
+        .media-info h4 {
+            margin-bottom: 5px;
+            color: #4CAF50;
+        }
+
+        .media-info p {
+            margin-bottom: 4px;
+            color: #aaa;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            display: none;
+        }
+
+        .playlist-panel {
+            background: rgba(255,255,255,0.1);
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            height: fit-content; /* Let it size naturally with content */
+            max-height: 800px; /* Match video max-height */
+            overflow-y: auto;
+        }
+
+        .playlist-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .playlist-item {
+            background: rgba(255,255,255,0.05);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .playlist-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .playlist-item.active {
+            background: rgba(76, 175, 80, 0.2);
+            border-left-color: #4CAF50;
+        }
+
+        .playlist-item.playing {
+            background: rgba(76, 175, 80, 0.3);
+            border-left-color: #4CAF50;
+            animation: playingGlow 2s infinite;
+        }
+
+        @keyframes playingGlow {
+            0%, 100% { box-shadow: 0 0 10px rgba(76, 175, 80, 0.3); }
+            50% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.6); }
+        }
+
+        .playlist-item h4 {
+            font-size: 0.9em;
+            margin-bottom: 4px;
+            color: #fff;
+        }
+
+        .playlist-item .time {
+            font-size: 0.8em;
+            color: #ccc;
+            font-family: monospace;
+        }
+
+        .playlist-item .description {
+            font-size: 0.75em;
+            color: #aaa;
+            margin-top: 4px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .controls {
+            background: rgba(255,255,255,0.1);
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn.primary {
+            background: #4CAF50;
+        }
+
+        .btn.primary:hover {
+            background: #45a049;
+        }
+
+        .btn.danger {
+            background: #f44336;
+        }
+
+        .btn.danger:hover {
+            background: #d32f2f;
+        }
+
+        .timeline {
+            margin: 20px 0;
+        }
+
+        .timeline-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 4px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .timeline-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #45a049);
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.1s ease;
+        }
+
+        .timeline-marker {
+            position: absolute;
+            top: -2px;
+            width: 12px;
+            height: 12px;
+            background: white;
+            border-radius: 50%;
+            transform: translateX(-50%);
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .timeline-bar:hover .timeline-marker {
+            opacity: 1;
+        }
+
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .volume-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .volume-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.05);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .volume-group label {
+            font-size: 0.85em;
+            min-width: 80px;
+            color: #ccc;
+        }
+
+        .volume-slider {
+            flex: 1;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .volume-value {
+            font-family: monospace;
+            font-size: 0.8em;
+            min-width: 35px;
+            text-align: right;
+        }
+
+        .debug-panel {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .debug-panel h3 {
+            margin-bottom: 10px;
+            color: #4CAF50;
+        }
+
+        .debug-log {
+            font-family: monospace;
+            font-size: 0.8em;
+            color: #ccc;
+            line-height: 1.4;
+        }
+
+        .debug-log .timestamp {
+            color: #888;
+        }
+
+        .debug-log .level-info {
+            color: #4CAF50;
+        }
+
+        .debug-log .level-warning {
+            color: #ff9800;
+        }
+
+        .debug-log .level-error {
+            color: #f44336;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .loading-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .loading-content {
+            text-align: center;
+            color: white;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="loadingOverlay" class="loading-overlay active">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <h3>Loading Weather Media Player...</h3>
+            <p>Initializing audio and video components</p>
+        </div>
+    </div>
+
+    <div class="player-container">
+        <div class="header">
+            <h1>🌤️ Nexcaster Weather Media Player</h1>
+            <p>Advanced synchronized weather presentation with overlapping audio/video playback</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <div id="manifestStatus" class="status-indicator loading"></div>
+                <span>Manifest: <span id="manifestStatusText">Loading...</span></span>
+            </div>
+            <div class="status-item">
+                <div id="audioStatus" class="status-indicator loading"></div>
+                <span>Audio: <span id="audioStatusText">Initializing...</span></span>
+            </div>
+            <div class="status-item">
+                <div id="videoStatus" class="status-indicator loading"></div>
+                <span>Video: <span id="videoStatusText">Initializing...</span></span>
+            </div>
+            <div class="status-item">
+                <span id="mediaCount">0 media items</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="video-stage">
+                <video id="mainVideo" class="main-video" preload="metadata" muted>
+                    Your browser does not support the video tag.
+                </video>
+
+                <div id="mediaInfo" class="media-info" style="display: none;">
+                    <h4 id="mediaTitle">Media Title</h4>
+                    <p id="mediaDescription">Media description will appear here</p>
+                    <p><small>Time: <span id="mediaTime">00:00 - 00:00</span></small></p>
+                </div>
+            </div>
+
+            <div class="playlist-panel">
+                <div class="playlist-header">
+                    <h3>📋 Media Timeline</h3>
+                    <span id="playlistCount">0 items</span>
+                </div>
+                <div id="playlistContainer">
+                    <!-- Playlist items will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-buttons">
+                <button id="playBtn" class="btn primary">
+                    <span>▶️</span> Play
+                </button>
+                <button id="pauseBtn" class="btn" disabled>
+                    <span>⏸️</span> Pause
+                </button>
+                <button id="stopBtn" class="btn danger" disabled>
+                    <span>⏹️</span> Stop
+                </button>
+                <button id="reloadBtn" class="btn">
+                    <span>🔄</span> Reload Manifest
+                </button>
+                <button id="debugBtn" class="btn">
+                    <span>🐛</span> Toggle Debug
+                </button>
+            </div>
+
+            <div class="timeline">
+                <div id="timelineBar" class="timeline-bar">
+                    <div id="timelineProgress" class="timeline-progress"></div>
+                    <div id="timelineMarker" class="timeline-marker"></div>
+                </div>
+                <div class="time-display">
+                    <span id="currentTime">00:00</span>
+                    <span id="totalTime">00:00</span>
+                </div>
+            </div>
+
+            <div class="volume-controls">
+                <div class="volume-group">
+                    <label>🎵 Main Audio:</label>
+                    <input type="range" id="mainAudioVolume" class="volume-slider" min="0" max="100" value="80" title="Main Audio Volume">
+                    <span id="mainAudioVolumeValue" class="volume-value">80%</span>
+                </div>
+                <div class="volume-group">
+                    <label>🎵 Background:</label>
+                    <input type="range" id="backgroundVolume" class="volume-slider" min="0" max="100" value="100" title="Background Music Volume">
+                    <span id="backgroundVolumeValue" class="volume-value">100%</span>
+                </div>
+                <div class="volume-group">
+                    <label>🎬 Video Audio:</label>
+                    <input type="range" id="videoVolume" class="volume-slider" min="0" max="100" value="100" title="Video Audio Volume">
+                    <span id="videoVolumeValue" class="volume-value">100%</span>
+                </div>
+                <div class="volume-group">
+                    <label>🔊 Master:</label>
+                    <input type="range" id="masterVolume" class="volume-slider" min="0" max="100" value="85" title="Master Volume">
+                    <span id="masterVolumeValue" class="volume-value">85%</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="debugPanel" class="debug-panel" style="display: none;">
+            <h3>🐛 Debug Console</h3>
+            <div id="debugLog" class="debug-log">
+                <div class="timestamp">[Loading...]</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden audio elements for multiple audio track playback -->
+    <audio id="mainAudio" preload="metadata"></audio>
+    <audio id="backgroundAudio" preload="metadata" loop></audio>
+    <audio id="segmentAudio" preload="metadata"></audio>
+
+    <script>
+        console.log('🎬 Nexcaster Weather Media Player - Initializing...');
+        
+        class WeatherMediaPlayer {
+            constructor() {
+                this.manifest = null;
+                this.currentTime = 0;
+                this.totalDuration = 0;
+                this.isPlaying = false;
+                this.mediaQueue = [];
+                this.activeMedia = new Set();
+                this.debugMode = false;
+                this.isLoading = false;
+                this.preloadedMedia = new Map(); // Cache for preloaded media
+                this.syncTolerance = 0.05; // 50ms tolerance for better sync
+                this.syncCounter = 0;
+                this.playbackStartTime = null;
+                this.pausedDuration = 0;
+                this.pausedTime = 0;
+                this.pauseStartTime = null;
+                
+                // Background music fade control
+                this.backgroundFadeStarted = false;
+                this.backgroundFadeStartTime = null;
+                this.mainAudioStartTime = null;
+                
+                // Audio/Video elements
+                this.mainAudio = document.getElementById('mainAudio');
+                this.backgroundAudio = document.getElementById('backgroundAudio');
+                this.segmentAudio = document.getElementById('segmentAudio');
+                this.mainVideo = document.getElementById('mainVideo');
+                
+                // Control elements
+                this.playBtn = document.getElementById('playBtn');
+                this.pauseBtn = document.getElementById('pauseBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                this.reloadBtn = document.getElementById('reloadBtn');
+                this.debugBtn = document.getElementById('debugBtn');
+                
+                // Timeline elements
+                this.timelineBar = document.getElementById('timelineBar');
+                this.timelineProgress = document.getElementById('timelineProgress');
+                this.timelineMarker = document.getElementById('timelineMarker');
+                this.currentTimeDisplay = document.getElementById('currentTime');
+                this.totalTimeDisplay = document.getElementById('totalTime');
+                
+                // Volume controls
+                this.mainAudioVolume = document.getElementById('mainAudioVolume');
+                this.backgroundVolume = document.getElementById('backgroundVolume');
+                this.videoVolume = document.getElementById('videoVolume');
+                this.masterVolume = document.getElementById('masterVolume');
+                
+                // Status elements
+                this.manifestStatus = document.getElementById('manifestStatus');
+                this.audioStatus = document.getElementById('audioStatus');
+                this.videoStatus = document.getElementById('videoStatus');
+                
+                // Other elements
+                this.playlistContainer = document.getElementById('playlistContainer');
+                this.debugLog = document.getElementById('debugLog');
+                this.loadingOverlay = document.getElementById('loadingOverlay');
+                
+                this.init();
+            }
+            
+            async init() {
+                this.log('info', 'Initializing Weather Media Player...');
+                
+                try {
+                    this.setupEventListeners();
+                    await this.loadManifest();
+                    await this.setupAudioVideoElements();
+                    this.populatePlaylist();
+                    this.updateStatus('ready');
+                    this.log('info', 'Player initialized successfully!');
+                } catch (error) {
+                    this.log('error', `Initialization failed: ${error.message}`);
+                    this.updateStatus('error');
+                } finally {
+                    this.hideLoading();
+                }
+            }
+            
+            setupEventListeners() {
+                // Control buttons
+                this.playBtn.addEventListener('click', () => this.play());
+                this.pauseBtn.addEventListener('click', () => this.pause());
+                this.stopBtn.addEventListener('click', () => this.stop());
+                this.reloadBtn.addEventListener('click', () => this.reload());
+                this.debugBtn.addEventListener('click', () => this.toggleDebug());
+                
+                // Timeline interaction
+                this.timelineBar.addEventListener('click', (e) => this.seekToPosition(e));
+                
+                // Volume controls
+                this.mainAudioVolume.addEventListener('input', (e) => this.updateVolume('main', e.target.value));
+                this.backgroundVolume.addEventListener('input', (e) => this.updateVolume('background', e.target.value));
+                this.videoVolume.addEventListener('input', (e) => this.updateVolume('video', e.target.value));
+                this.masterVolume.addEventListener('input', (e) => this.updateVolume('master', e.target.value));
+                
+                // Audio/Video event listeners
+                this.mainAudio.addEventListener('timeupdate', () => this.updateTimeline());
+                this.mainAudio.addEventListener('ended', () => this.handlePlaybackEnd());
+                
+                this.log('info', 'Event listeners setup complete');
+            }
+            
+            async loadManifest() {
+                this.log('info', 'Loading weather subtitle manifest...');
+                
+                try {
+                    const response = await fetch('data/latest/manifest.json');
+                    if (!response.ok) {
+                        throw new Error(`Failed to load manifest: ${response.status}`);
+                    }
+                    
+                    this.manifest = await response.json();
+                    this.totalDuration = this.manifest.metadata.total_duration;
+                    
+                    // Get timing information from metadata
+                    const introDuration = this.manifest.metadata.intro_duration || 0;
+                    const outroDuration = this.manifest.metadata.outro_duration || 0;
+                    const mainAudioDuration = this.manifest.metadata.main_audio_duration || 0;
+                    
+                    // Convert subtitles to media queue format for player
+                    this.mediaQueue = this.manifest.subtitles.map(subtitle => ({
+                        start_time: subtitle.start_time,
+                        end_time: subtitle.end_time,
+                        duration: subtitle.end_time - subtitle.start_time,
+                        media_type: subtitle.media_type,
+                        text: subtitle.text,
+                        confidence: subtitle.confidence,
+                        description: `${subtitle.text.substring(0, 100)}${subtitle.text.length > 100 ? '...' : ''}`,
+                        filepath: this.getMediaFilePath(subtitle.media_type)
+                    }));
+                    
+                    // Add main weather audio as a separate track (starts after intro)
+                    const mainAudioFile = {
+                        start_time: introDuration,
+                        end_time: introDuration + mainAudioDuration,
+                        duration: mainAudioDuration,
+                        media_type: 'main_weather_audio',
+                        text: 'Complete weather report audio',
+                        confidence: 1.0,
+                        description: 'Main weather report narration',
+                        filepath: `data/latest/audio/${this.manifest.metadata.source_audio}`,
+                        _isMainAudio: true  // Flag to identify main audio track
+                    };
+                    this.mediaQueue.unshift(mainAudioFile);
+                    
+                    // Sort by start time
+                    this.mediaQueue.sort((a, b) => a.start_time - b.start_time);
+                    
+                    this.log('info', `Manifest loaded: ${this.manifest.subtitles.length} subtitle segments, ${this.formatTime(this.totalDuration)} total duration`);
+                    this.log('info', `Timing: intro ${this.formatTime(introDuration)} + main audio ${this.formatTime(mainAudioDuration)} + outro ${this.formatTime(outroDuration)}`);
+                    
+                    // Update UI
+                    document.getElementById('mediaCount').textContent = `${this.manifest.subtitles.length} subtitle segments`;
+                    document.getElementById('playlistCount').textContent = `${this.mediaQueue.length} items`;
+                    this.totalTimeDisplay.textContent = this.formatTime(this.totalDuration);
+                    
+                    this.updateStatus('manifest', 'loaded');
+                    
+                } catch (error) {
+                    this.log('error', `Failed to load manifest: ${error.message}`);
+                    this.updateStatus('manifest', 'error');
+                    throw error;
+                }
+            }
+            
+            getMediaFilePath(mediaType) {
+                // Map media types to file paths based on actual available files
+                if (mediaType.includes('.mp4') || mediaType.includes('.webm')) {
+                    return `data/latest/multimedia/${mediaType}`;
+                } else if (mediaType.startsWith('card-')) {
+                    // Card types are already prefixed correctly
+                    return `data/latest/multimedia/${mediaType}.webm`;
+                } else if (mediaType === 'weather_map1') {
+                    return `data/latest/multimedia/card-weather_map1.webm`;
+                } else if (mediaType === 'weather_map2') {
+                    return `data/latest/multimedia/card-weather_map2.webm`;
+                } else if (mediaType.includes('intro') || mediaType.includes('outro')) {
+                    return `data/latest/multimedia/${mediaType}.mp4`;
+                } else {
+                    // Default mapping - try card- prefix first
+                    return `data/latest/multimedia/card-${mediaType}.webm`;
+                }
+            }
+            
+            async setupAudioVideoElements() {
+                this.log('info', 'Setting up audio and video elements...');
+                
+                // Set up main audio (main weather report)
+                const mainAudioItem = this.mediaQueue.find(item => item.media_type === 'main_weather_audio');
+                if (mainAudioItem) {
+                    this.mainAudio.src = mainAudioItem.filepath;
+                    this.log('info', `Main audio set: ${mainAudioItem.filepath}`);
+                }
+                
+                // Set up background music if available (graceful fallback)
+                try {
+                    // Try to find background music file in audio directory
+                    const response = await fetch('data/latest/audio/background_music.mp3', { method: 'HEAD' });
+                    if (response.ok) {
+                        this.backgroundAudio.src = 'data/latest/audio/background_music.mp3';
+                        this.backgroundAudio.volume = 0.15; // Lower background volume (15%)
+                        this.log('info', 'Background music set: data/latest/audio/background_music.mp3');
+                    } else {
+                        throw new Error('Background music not found');
+                    }
+                } catch (error) {
+                    this.log('info', 'Background music not available - continuing without background audio');
+                    // Disable background music controls if no background music
+                    const bgVolumeGroup = document.querySelector('.volume-group:nth-child(2)');
+                    if (bgVolumeGroup) {
+                        bgVolumeGroup.style.opacity = '0.5';
+                        bgVolumeGroup.title = 'Background music not available';
+                    }
+                }
+                
+                // Preload critical media files
+                await this.preloadCriticalMedia();
+                
+                // Apply initial volume settings
+                this.updateVolume('main', this.mainAudioVolume.value);
+                this.updateVolume('background', this.backgroundVolume.value);
+                this.updateVolume('video', this.videoVolume.value);
+                this.updateVolume('master', this.masterVolume.value);
+                
+                this.updateStatus('audio', 'ready');
+                this.updateStatus('video', 'ready');
+                this.log('info', 'Audio and video elements setup complete');
+            }
+            
+            async preloadCriticalMedia() {
+                this.log('info', 'Preloading critical media files...');
+                
+                try {
+                    // Preload first few video files for smooth playback
+                    const videoItems = this.mediaQueue.filter(item => 
+                        item.media_type.includes('.mp4') || 
+                        item.media_type.includes('.webm') || 
+                        item.media_type.startsWith('card-') ||
+                        item.media_type.startsWith('weather_')
+                    ).slice(0, 5); // Preload first 5 videos
+                    
+                    for (const item of videoItems) {
+                        await this.preloadMediaFile(item);
+                    }
+                    
+                    this.log('info', `Preloaded ${videoItems.length} video files`);
+                } catch (error) {
+                    this.log('warning', `Preloading failed: ${error.message}`);
+                }
+            }
+            
+            async preloadMediaFile(item) {
+                try {
+                    if (this.preloadedMedia.has(item.filepath)) {
+                        return; // Already preloaded
+                    }
+                    
+                    const video = document.createElement('video');
+                    video.src = item.filepath;
+                    video.preload = 'metadata';
+                    video.muted = true;
+                    
+                    return new Promise((resolve, reject) => {
+                        video.onloadedmetadata = () => {
+                            this.preloadedMedia.set(item.filepath, video);
+                            this.log('info', `Preloaded: ${item.media_type}`);
+                            resolve();
+                        };
+                        video.onerror = () => {
+                            this.log('warning', `Failed to preload: ${item.media_type}`);
+                            reject(new Error(`Failed to preload ${item.filepath}`));
+                        };
+                        
+                        // Timeout after 5 seconds
+                        setTimeout(() => {
+                            reject(new Error(`Preload timeout for ${item.filepath}`));
+                        }, 5000);
+                    });
+                } catch (error) {
+                    this.log('warning', `Error preloading ${item.filepath}: ${error.message}`);
+                }
+            }
+            
+            populatePlaylist() {
+                this.log('info', 'Populating playlist...');
+                
+                this.playlistContainer.innerHTML = '';
+                
+                this.mediaQueue.forEach((item, index) => {
+                    const playlistItem = document.createElement('div');
+                    playlistItem.className = 'playlist-item';
+                    playlistItem.dataset.index = index;
+                    
+                    playlistItem.innerHTML = `
+                        <h4>${this.getMediaDisplayName(item)}</h4>
+                        <div class="time">${this.formatTime(item.start_time)} - ${this.formatTime(item.end_time)}</div>
+                        <div class="description">${item.description || 'No description available'}</div>
+                    `;
+                    
+                    playlistItem.addEventListener('click', () => this.seekToMediaItem(index));
+                    this.playlistContainer.appendChild(playlistItem);
+                });
+                
+                this.log('info', `Playlist populated with ${this.mediaQueue.length} items`);
+            }
+            
+            getMediaDisplayName(item) {
+                const forcedPrefix = item._forced ? '🔥 FORCED: ' : '';
+                
+                if (item.media_type.includes('audio')) {
+                    return `${forcedPrefix}🎵 ${item.media_type.replace('_audio', '').replace('_', ' ')}`;
+                } else if (item.media_type.includes('card-')) {
+                    return `${forcedPrefix}📊 ${item.media_type.replace('card-', '').replace('-', ' ')}`;
+                } else if (item.media_type.includes('.mp4') || item.media_type.includes('.webm')) {
+                    return `${forcedPrefix}🎬 ${item.media_type.replace(/\.(mp4|webm)/, '')}`;
+                } else if (item.media_type.includes('weather_map')) {
+                    return `${forcedPrefix}🗺️ ${item.media_type.replace(/\.(mp4|webm)/, '')}`;
+                }
+                return `${forcedPrefix}📄 ${item.media_type}`;
+            }
+            
+            async play() {
+                this.log('info', 'Starting playback...');
+                
+                try {
+                    this.isLoading = true;
+                    this.playBtn.disabled = true;
+                    this.pauseBtn.disabled = false;
+                    this.stopBtn.disabled = false;
+                    
+                    // Ensure main audio is ready
+                    if (this.mainAudio.readyState < 3) {
+                        this.log('info', 'Waiting for main audio to be ready...');
+                        await new Promise((resolve) => {
+                            const onReady = () => {
+                                this.mainAudio.removeEventListener('canplaythrough', onReady);
+                                resolve();
+                            };
+                            this.mainAudio.addEventListener('canplaythrough', onReady);
+                        });
+                    }
+                    
+                    // Ensure background audio is ready if available
+                    if (this.backgroundAudio.src && this.backgroundAudio.readyState < 3) {
+                        this.log('info', 'Waiting for background audio to be ready...');
+                        await new Promise((resolve) => {
+                            const onReady = () => {
+                                this.backgroundAudio.removeEventListener('canplaythrough', onReady);
+                                resolve();
+                            };
+                            this.backgroundAudio.addEventListener('canplaythrough', onReady);
+                        });
+                    }
+                    
+                    this.isPlaying = true;
+                    this.isLoading = false;
+                    this.syncCounter = 0; // Reset sync counter
+                    
+                    // Handle resuming from pause
+                    if (this.pauseStartTime && this.pausedTime !== undefined) {
+                        // We're resuming from a pause
+                        this.pausedDuration += (performance.now() - this.pauseStartTime);
+                        this.currentTime = this.pausedTime;
+                        this.pauseStartTime = null;
+                        this.log('info', `Resuming playback from ${this.formatTime(this.currentTime)}`);
+                    } else {
+                        // Starting fresh
+                        this.currentTime = 0;
+                        this.playbackStartTime = null; // Will be set in startMediaSync
+                        this.pausedDuration = 0;
+                        
+                        // Clear any active media from previous playback
+                        this.activeMedia.clear();
+                        this.log('info', 'Starting fresh playback');
+                    }
+                    
+                    // DO NOT start main audio immediately - let the media sync system handle it
+                    // based on the manifest timing (it should start at intro_duration, not at 0)
+                    this.log('info', 'Playback initialized - media sync will handle audio timing');
+                    
+                    // Handle background music based on current time
+                    if (this.backgroundAudio.src) {
+                        this.backgroundAudio.currentTime = this.currentTime;
+                        await this.backgroundAudio.play();
+                        this.log('info', `Background music started at ${this.formatTime(this.currentTime)}`);
+                    }
+                    
+                    // Start the media synchronization loop - this will handle all media timing
+                    this.startMediaSync();
+                    
+                    this.log('info', 'Playback started successfully - media sync controlling all timing');
+                    
+                } catch (error) {
+                    this.log('error', `Playback failed: ${error.message}`);
+                    this.isPlaying = false;
+                    this.isLoading = false;
+                    this.playBtn.disabled = false;
+                    this.pauseBtn.disabled = true;
+                    this.stopBtn.disabled = true;
+                }
+            }
+            
+            pause() {
+                this.log('info', 'Pausing playback...');
+                
+                this.isPlaying = false;
+                this.playBtn.disabled = false;
+                this.pauseBtn.disabled = true;
+                
+                // Record pause time for timeline calculation
+                if (this.playbackStartTime) {
+                    const elapsedMs = performance.now() - this.playbackStartTime - this.pausedDuration;
+                    this.pausedTime = elapsedMs / 1000;
+                    this.pauseStartTime = performance.now();
+                }
+                
+                // Pause all audio
+                this.mainAudio.pause();
+                this.backgroundAudio.pause();
+                this.segmentAudio.pause();
+                
+                // Pause all video
+                this.mainVideo.pause();
+                
+                this.log('info', 'Playback paused');
+            }
+            
+            stop() {
+                this.log('info', 'Stopping playback...');
+                
+                this.isPlaying = false;
+                this.currentTime = 0;
+                this.activeMedia.clear();
+                
+                // Reset timeline tracking
+                this.playbackStartTime = null;
+                this.pausedDuration = 0;
+                this.pausedTime = 0;
+                this.pauseStartTime = null;
+                
+                // Reset background fade state
+                this.backgroundFadeStarted = false;
+                this.backgroundFadeStartTime = null;
+                
+                // Restore background music to 100%
+                this.backgroundVolume.value = 100;
+                this.updateVolume('background', 100);
+                document.getElementById('backgroundVolumeValue').textContent = '100%';
+                
+                // Stop and reset all audio
+                this.mainAudio.pause();
+                this.mainAudio.currentTime = 0;
+                this.backgroundAudio.pause();
+                this.backgroundAudio.currentTime = 0;
+                this.segmentAudio.pause();
+                this.segmentAudio.currentTime = 0;
+                
+                // Stop and reset main video
+                this.mainVideo.pause();
+                this.mainVideo.currentTime = 0;
+                this.mainVideo.src = ''; // Clear video source
+                
+                // Reset UI
+                this.playBtn.disabled = false;
+                this.pauseBtn.disabled = true;
+                this.stopBtn.disabled = true;
+                
+                this.updateTimeline();
+                this.clearActivePlaylistItems();
+                
+                this.log('info', 'Playback stopped and background music restored to 100%');
+            }
+            
+            async reload() {
+                this.log('info', 'Reloading player...');
+                this.showLoading();
+                
+                try {
+                    this.stop();
+                    await this.loadManifest();
+                    await this.setupAudioVideoElements();
+                    this.populatePlaylist();
+                    this.updateStatus('ready');
+                    this.log('info', 'Player reloaded successfully');
+                } catch (error) {
+                    this.log('error', `Reload failed: ${error.message}`);
+                } finally {
+                    this.hideLoading();
+                }
+            }
+            
+            startMediaSync() {
+                if (!this.isPlaying) return;
+                
+                // Use independent timeline instead of relying on main audio
+                // Update currentTime based on playback start time and elapsed time
+                if (!this.playbackStartTime) {
+                    this.playbackStartTime = performance.now();
+                    this.pausedDuration = 0;
+                }
+                
+                const elapsedMs = performance.now() - this.playbackStartTime - this.pausedDuration;
+                this.currentTime = Math.max(0, elapsedMs / 1000); // Convert to seconds
+                
+                // Check if we've reached the total duration
+                if (this.currentTime >= this.totalDuration) {
+                    this.log('info', 'Total duration reached - ending playback automatically');
+                    this.stop();
+                    return;
+                }
+                
+                // Sync media at current time
+                this.syncMediaAtCurrentTime();
+                
+                // Periodic sync correction every 500ms
+                if (this.syncCounter % 30 === 0) { // Every 30 frames (~500ms at 60fps)
+                    this.performSyncCorrection();
+                }
+                this.syncCounter = (this.syncCounter || 0) + 1;
+                
+                // Schedule next sync frame
+                requestAnimationFrame(() => this.startMediaSync());
+            }
+            
+            performSyncCorrection() {
+                // Check if background audio is still in sync
+                if (this.backgroundAudio.src && !this.backgroundAudio.paused) {
+                    const mainTime = this.currentTime;
+                    const bgTime = this.backgroundAudio.currentTime;
+                    const drift = Math.abs(mainTime - bgTime);
+                    
+                    if (drift > 0.1) { // More than 100ms drift
+                        this.log('warning', `Audio drift detected: ${drift.toFixed(3)}s - correcting`);
+                        try {
+                            this.backgroundAudio.currentTime = mainTime;
+                        } catch (error) {
+                            this.log('warning', `Failed to correct background audio sync: ${error.message}`);
+                        }
+                    }
+                }
+                
+                // Check video sync if playing
+                if (this.mainVideo.src && !this.mainVideo.paused) {
+                    const activeVideoItem = Array.from(this.activeMedia).find(item => 
+                        item.media_type.includes('.mp4') || 
+                        item.media_type.includes('.webm') || 
+                        item.media_type.startsWith('card-') ||
+                        item.media_type.startsWith('weather_')
+                    );
+                    
+                    if (activeVideoItem) {
+                        const expectedVideoTime = Math.max(0, this.currentTime - activeVideoItem.start_time);
+                        const actualVideoTime = this.mainVideo.currentTime;
+                        const videoDrift = Math.abs(expectedVideoTime - actualVideoTime);
+                        
+                        if (videoDrift > 0.2) { // More than 200ms drift
+                            this.log('warning', `Video drift detected: ${videoDrift.toFixed(3)}s - correcting`);
+                            try {
+                                this.mainVideo.currentTime = expectedVideoTime;
+                            } catch (error) {
+                                this.log('warning', `Failed to correct video sync: ${error.message}`);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            syncMediaAtCurrentTime() {
+                const tolerance = this.syncTolerance; // 50ms tolerance for better sync
+                
+                // Handle background music fade (2 seconds before main audio)
+                this.handleBackgroundMusicFade();
+                
+                // Find media that should be active at current time
+                const currentActiveMedia = this.mediaQueue.filter(item => 
+                    this.currentTime >= item.start_time - tolerance && 
+                    this.currentTime <= item.end_time + tolerance
+                );
+                
+                // Debug logging only when active media changes or in debug mode
+                const activeMediaChanged = this.hasActiveMediaChanged(currentActiveMedia);
+                if (this.debugMode || activeMediaChanged || (this.currentTime > 10 && this.currentTime < 30 && Math.floor(this.currentTime * 2) % 10 === 0)) {
+                    const activeTypes = currentActiveMedia.map(item => item.media_type).join(', ');
+                    this.log('info', `Active media at ${this.formatTime(this.currentTime)}: [${activeTypes}]`);
+                }
+                
+                // Handle new media
+                currentActiveMedia.forEach(item => {
+                    if (!this.activeMedia.has(item)) {
+                        this.activateMediaWithSync(item);
+                    }
+                });
+                
+                // Handle ended media
+                this.activeMedia.forEach(item => {
+                    if (!currentActiveMedia.includes(item)) {
+                        this.deactivateMedia(item);
+                    }
+                });
+                
+                // Check if video display priority has changed
+                const currentPrioritizedMedia = this.getPrioritizedMediaForDisplay(currentActiveMedia);
+                const currentVideoSrc = this.mainVideo.src;
+                
+                if (currentPrioritizedMedia && 
+                    (currentPrioritizedMedia.media_type.includes('.mp4') || 
+                     currentPrioritizedMedia.media_type.includes('.webm') || 
+                     currentPrioritizedMedia.media_type.startsWith('card-') || 
+                     currentPrioritizedMedia.media_type.startsWith('weather_'))) {
+                    
+                    // Check if we need to switch to a different video
+                    const expectedSrc = currentPrioritizedMedia.filepath;
+                    if (!currentVideoSrc.includes(currentPrioritizedMedia.filepath.split('/').pop())) {
+                        this.log('info', `Priority changed - switching to ${currentPrioritizedMedia.media_type}`);
+                        this.switchVideoWithSync(currentPrioritizedMedia).catch(error => {
+                            this.log('warning', `Failed to switch video on priority change: ${error.message}`);
+                        });
+                    }
+                }
+                
+                this.updateActivePlaylistItems(currentActiveMedia);
+                
+                // Prioritize visual media for display info
+                // Show visual media (videos/cards) over audio in the media info
+                this.updateMediaInfo(currentPrioritizedMedia);
+            }
+            
+            hasActiveMediaChanged(currentActiveMedia) {
+                if (!this.lastActiveMedia) {
+                    this.lastActiveMedia = [];
+                }
+                
+                const currentTypes = currentActiveMedia.map(item => item.media_type).sort();
+                const lastTypes = this.lastActiveMedia.map(item => item.media_type).sort();
+                
+                const changed = JSON.stringify(currentTypes) !== JSON.stringify(lastTypes);
+                if (changed) {
+                    this.lastActiveMedia = [...currentActiveMedia];
+                }
+                
+                return changed;
+            }
+            
+            async activateMediaWithSync(item) {
+                this.activeMedia.add(item);
+                this.log('info', `Activating media: ${item.media_type} at ${this.formatTime(item.start_time)}`);
+                
+                try {
+                    if (item.media_type.includes('.mp4') || item.media_type.includes('.webm') || item.media_type.startsWith('card-') || item.media_type.startsWith('weather_')) {
+                        // Only switch video if this item has priority for display
+                        const currentActiveMedia = this.mediaQueue.filter(activeItem => 
+                            this.currentTime >= activeItem.start_time - this.syncTolerance && 
+                            this.currentTime <= activeItem.end_time + this.syncTolerance
+                        );
+                        
+                        const prioritizedMedia = this.getPrioritizedMediaForDisplay(currentActiveMedia);
+                        
+                        if (prioritizedMedia === item) {
+                            this.log('info', `${item.media_type} has display priority - switching video`);
+                            await this.switchVideoWithSync(item);
+                        } else {
+                            this.log('info', `${item.media_type} activated but ${prioritizedMedia?.media_type || 'none'} has display priority`);
+                        }
+                    } else if (item.media_type === 'main_weather_audio') {
+                        // Handle main weather audio - this starts after intro duration
+                        this.mainAudio.src = item.filepath;
+                        
+                        // Calculate offset time within the main audio file
+                        // The main audio file itself starts at 0, but in our timeline it starts at intro_duration
+                        const offsetTime = Math.max(0, this.currentTime - item.start_time);
+                        this.mainAudio.currentTime = offsetTime;
+                        
+                        await this.mainAudio.play();
+                        this.log('info', `Playing main weather audio: ${item.media_type} with offset: ${offsetTime.toFixed(2)}s (timeline: ${this.currentTime.toFixed(2)}s)`);
+                        
+                        // Duck background music when main audio starts
+                        this.duckBackgroundMusic();
+                        
+                    } else if (item.media_type.includes('_audio') && !item.media_type.includes('main_weather_audio')) {
+                        // Segment audio with precise timing
+                        this.segmentAudio.src = item.filepath;
+                        const offsetTime = Math.max(0, this.currentTime - item.start_time);
+                        this.segmentAudio.currentTime = offsetTime;
+                        await this.segmentAudio.play();
+                        this.log('info', `Playing segment audio: ${item.media_type} with offset: ${offsetTime.toFixed(2)}s`);
+                    }
+                } catch (error) {
+                    this.log('warning', `Failed to activate media ${item.media_type}: ${error.message}`);
+                }
+            }
+            
+            async switchVideoWithSync(item) {
+                try {
+                    // Special handling for forced weather maps
+                    if (item._forced) {
+                        this.log('info', `Attempting to load FORCED weather map: ${item.media_type}`);
+                    }
+                    
+                    // Check if we have a preloaded version
+                    const preloadedVideo = this.preloadedMedia.get(item.filepath);
+                    
+                    if (preloadedVideo) {
+                        // Use preloaded video for faster switching
+                        this.mainVideo.src = item.filepath;
+                        this.mainVideo.currentTime = 0;
+                        
+                        // Wait for the video to be ready
+                        await new Promise((resolve, reject) => {
+                            const onReady = () => {
+                                this.mainVideo.removeEventListener('canplay', onReady);
+                                this.mainVideo.removeEventListener('error', onError);
+                                resolve();
+                            };
+                            const onError = () => {
+                                this.mainVideo.removeEventListener('canplay', onReady);
+                                this.mainVideo.removeEventListener('error', onError);
+                                reject(new Error('Video failed to load'));
+                            };
+                            
+                            if (this.mainVideo.readyState >= 3) { // HAVE_FUTURE_DATA
+                                resolve();
+                            } else {
+                                this.mainVideo.addEventListener('canplay', onReady);
+                                this.mainVideo.addEventListener('error', onError);
+                            }
+                        });
+                    } else {
+                        // Direct loading with better error handling for forced maps
+                        this.mainVideo.src = item.filepath;
+                        this.mainVideo.currentTime = 0;
+                        
+                        // For forced maps, add extra error handling
+                        if (item._forced) {
+                            await new Promise((resolve, reject) => {
+                                const timeout = setTimeout(() => {
+                                    this.log('warning', `Forced weather map ${item.media_type} failed to load - file may not exist`);
+                                    reject(new Error(`Forced weather map timeout: ${item.filepath}`));
+                                }, 3000); // 3 second timeout
+                                
+                                const onReady = () => {
+                                    clearTimeout(timeout);
+                                    this.mainVideo.removeEventListener('canplay', onReady);
+                                    this.mainVideo.removeEventListener('error', onError);
+                                    this.log('info', `FORCED weather map loaded successfully: ${item.media_type}`);
+                                    resolve();
+                                };
+                                
+                                const onError = (e) => {
+                                    clearTimeout(timeout);
+                                    this.mainVideo.removeEventListener('canplay', onReady);
+                                    this.mainVideo.removeEventListener('error', onError);
+                                    this.log('warning', `FORCED weather map failed to load: ${item.media_type} - ${e.message || 'unknown error'}`);
+                                    reject(new Error(`Forced weather map load error: ${item.filepath}`));
+                                };
+                                
+                                if (this.mainVideo.readyState >= 3) {
+                                    clearTimeout(timeout);
+                                    resolve();
+                                } else {
+                                    this.mainVideo.addEventListener('canplay', onReady);
+                                    this.mainVideo.addEventListener('error', onError);
+                                }
+                            });
+                        }
+                    }
+                    
+                    // Calculate video start offset for sync
+                    const videoOffset = Math.max(0, this.currentTime - item.start_time);
+                    if (videoOffset > 0) {
+                        this.mainVideo.currentTime = videoOffset;
+                        this.log('info', `Video ${item.media_type} started with offset: ${videoOffset.toFixed(2)}s`);
+                    }
+                    
+                    await this.mainVideo.play();
+                    this.log('info', `Playing video: ${item.media_type}${item._forced ? ' (FORCED)' : ''}`);
+                    
+                } catch (error) {
+                    if (item._forced) {
+                        this.log('error', `FORCED weather map failed: ${item.media_type} - ${error.message}`);
+                        this.log('info', `Check if file exists: ${item.filepath}`);
+                    } else {
+                        this.log('error', `Failed to switch video ${item.media_type}: ${error.message}`);
+                    }
+                    throw error;
+                }
+            }
+            
+            deactivateMedia(item) {
+                this.activeMedia.delete(item);
+                this.log('info', `Deactivating media: ${item.media_type}`);
+                
+                if (item.media_type === 'main_weather_audio') {
+                    this.mainAudio.pause();
+                    
+                    // Restore background music when main audio ends
+                    this.log('info', 'Main weather audio ended - restoring background music');
+                    this.restoreBackgroundMusic();
+                    
+                } else if (item.media_type.includes('_audio') && !item.media_type.includes('main_weather_audio')) {
+                    this.segmentAudio.pause();
+                }
+                // Note: We don't pause main video here as it should continue playing until the next video starts
+            }
+            
+            showVideoOverlay() {
+                // No longer needed for sequential playback
+            }
+            
+            hideVideoOverlay() {
+                // No longer needed for sequential playback
+            }
+            
+            updateActivePlaylistItems(activeItems) {
+                // Clear all active states
+                this.clearActivePlaylistItems();
+                
+                // Get the prioritized media item (same logic as media info display)
+                const prioritizedMedia = this.getPrioritizedMediaForDisplay(activeItems);
+                
+                if (prioritizedMedia) {
+                    // Only highlight the prioritized media item in the playlist
+                    const index = this.mediaQueue.indexOf(prioritizedMedia);
+                    const playlistItem = this.playlistContainer.querySelector(`[data-index="${index}"]`);
+                    if (playlistItem) {
+                        playlistItem.classList.add('playing');
+                        
+                        // Auto-scroll to the currently playing item for better visibility
+                        playlistItem.scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'nearest' 
+                        });
+                    }
+                }
+                
+                // Also show all other active items with a dimmer highlight
+                activeItems.forEach(item => {
+                    if (item !== prioritizedMedia) {
+                        const index = this.mediaQueue.indexOf(item);
+                        const playlistItem = this.playlistContainer.querySelector(`[data-index="${index}"]`);
+                        if (playlistItem) {
+                            playlistItem.classList.add('active'); // Use 'active' for secondary items
+                        }
+                    }
+                });
+            }
+            
+            clearActivePlaylistItems() {
+                this.playlistContainer.querySelectorAll('.playlist-item').forEach(item => {
+                    item.classList.remove('active', 'playing');
+                });
+            }
+            
+            updateMediaInfo(item) {
+                const mediaInfo = document.getElementById('mediaInfo');
+                
+                if (item) {
+                    document.getElementById('mediaTitle').textContent = this.getMediaDisplayName(item);
+                    document.getElementById('mediaDescription').textContent = item.description || 'No description available';
+                    document.getElementById('mediaTime').textContent = `${this.formatTime(item.start_time)} - ${this.formatTime(item.end_time)}`;
+                    mediaInfo.style.display = 'block';
+                } else {
+                    mediaInfo.style.display = 'none';
+                }
+            }
+            
+            updateTimeline() {
+                if (this.totalDuration > 0) {
+                    const progress = (this.currentTime / this.totalDuration) * 100;
+                    this.timelineProgress.style.width = `${progress}%`;
+                    this.timelineMarker.style.left = `${progress}%`;
+                }
+                
+                this.currentTimeDisplay.textContent = this.formatTime(this.currentTime);
+            }
+            
+            seekToPosition(event) {
+                const rect = this.timelineBar.getBoundingClientRect();
+                const clickX = event.clientX - rect.left;
+                const percentage = clickX / rect.width;
+                const newTime = percentage * this.totalDuration;
+                
+                this.seekToTime(newTime);
+            }
+            
+            seekToTime(time) {
+                this.log('info', `Seeking to ${this.formatTime(time)}`);
+                
+                this.currentTime = Math.max(0, Math.min(time, this.totalDuration));
+                
+                // Update timeline tracking for seeking
+                this.playbackStartTime = performance.now() - (this.currentTime * 1000);
+                this.pausedDuration = 0;
+                
+                // Sync background audio to new time
+                if (this.backgroundAudio.src && !this.backgroundAudio.paused) {
+                    this.backgroundAudio.currentTime = this.currentTime;
+                }
+                
+                // Reset all active media and let sync system reactivate what should be playing
+                this.activeMedia.clear();
+                this.clearActivePlaylistItems();
+                
+                // Force immediate sync to new position
+                this.syncMediaAtCurrentTime();
+                
+                this.updateTimeline();
+                this.log('info', `Seeked to ${this.formatTime(this.currentTime)}`);
+            }
+            
+            seekToMediaItem(index) {
+                const item = this.mediaQueue[index];
+                if (item) {
+                    this.seekToTime(item.start_time);
+                    
+                    // Highlight the selected item
+                    this.clearActivePlaylistItems();
+                    const playlistItem = this.playlistContainer.querySelector(`[data-index="${index}"]`);
+                    if (playlistItem) {
+                        playlistItem.classList.add('active');
+                    }
+                }
+            }
+            
+            updateVolume(type, value) {
+                const volume = parseInt(value) / 100;
+                const masterVol = parseInt(this.masterVolume.value) / 100;
+                const finalVolume = volume * masterVol;
+                
+                switch (type) {
+                    case 'main':
+                        this.mainAudio.volume = finalVolume;
+                        this.segmentAudio.volume = finalVolume;
+                        document.getElementById('mainAudioVolumeValue').textContent = `${value}%`;
+                        break;
+                    case 'background':
+                        this.backgroundAudio.volume = finalVolume;
+                        document.getElementById('backgroundVolumeValue').textContent = `${value}%`;
+                        break;
+                    case 'video':
+                        this.mainVideo.volume = finalVolume;
+                        document.getElementById('videoVolumeValue').textContent = `${value}%`;
+                        break;
+                    case 'master':
+                        // Re-apply all volumes with new master level
+                        this.updateVolume('main', this.mainAudioVolume.value);
+                        this.updateVolume('background', this.backgroundVolume.value);
+                        this.updateVolume('video', this.videoVolume.value);
+                        document.getElementById('masterVolumeValue').textContent = `${value}%`;
+                        break;
+                }
+            }
+            
+            handlePlaybackEnd() {
+                this.log('info', 'Main audio ended - continuing for outro content');
+                
+                // Don't stop immediately - let outro content play
+                // Restore background music to 100% when main audio ends
+                this.restoreBackgroundMusic();
+                
+                // Check if we're near the total duration, if so, end playback
+                const timeRemaining = this.totalDuration - this.currentTime;
+                if (timeRemaining <= 1.0) { // Less than 1 second remaining
+                    this.log('info', 'Total duration reached - ending playback');
+                    this.stop();
+                } else {
+                    this.log('info', `Continuing playback for outro - ${this.formatTime(timeRemaining)} remaining`);
+                }
+            }
+            
+            updateStatus(component, status = 'ready') {
+                const statusMap = {
+                    ready: { class: '', text: 'Ready' },
+                    loading: { class: 'loading', text: 'Loading...' },
+                    error: { class: 'error', text: 'Error' },
+                    loaded: { class: '', text: 'Loaded' }
+                };
+                
+                const statusInfo = statusMap[status] || statusMap.ready;
+                
+                if (component === 'manifest') {
+                    this.manifestStatus.className = `status-indicator ${statusInfo.class}`;
+                    document.getElementById('manifestStatusText').textContent = statusInfo.text;
+                } else if (component === 'audio') {
+                    this.audioStatus.className = `status-indicator ${statusInfo.class}`;
+                    document.getElementById('audioStatusText').textContent = statusInfo.text;
+                } else if (component === 'video') {
+                    this.videoStatus.className = `status-indicator ${statusInfo.class}`;
+                    document.getElementById('videoStatusText').textContent = statusInfo.text;
+                }
+            }
+            
+            toggleDebug() {
+                this.debugMode = !this.debugMode;
+                const debugPanel = document.getElementById('debugPanel');
+                
+                if (this.debugMode) {
+                    debugPanel.style.display = 'block';
+                    this.debugBtn.textContent = '🐛 Hide Debug';
+                    this.log('info', 'Debug mode enabled');
+                } else {
+                    debugPanel.style.display = 'none';
+                    this.debugBtn.textContent = '🐛 Show Debug';
+                    this.log('info', 'Debug mode disabled');
+                }
+            }
+            
+            showLoading() {
+                this.loadingOverlay.classList.add('active');
+            }
+            
+            hideLoading() {
+                this.loadingOverlay.classList.remove('active');
+            }
+            
+            log(level, message) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = `<div><span class="timestamp">[${timestamp}]</span> <span class="level-${level}">[${level.toUpperCase()}]</span> ${message}</div>`;
+                
+                this.debugLog.innerHTML += logEntry;
+                this.debugLog.scrollTop = this.debugLog.scrollHeight;
+                
+                // Also log to browser console
+                console.log(`[WeatherPlayer] ${message}`);
+                
+                // Keep only last 100 log entries
+                const entries = this.debugLog.children;
+                if (entries.length > 100) {
+                    entries[0].remove();
+                }
+            }
+            
+            formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+            
+            getPrioritizedMediaForDisplay(activeItems) {
+                if (!activeItems || activeItems.length === 0) {
+                    return null;
+                }
+                
+                // Priority order for media info display:
+                // 1. Intro/Outro videos (highest priority)
+                // 2. Weather maps (weather_map1, weather_map2) - HIGH PRIORITY
+                // 3. Visual cards and other videos 
+                // 4. Main weather audio (lowest priority, only if no visuals)
+                // 5. Other audio (segment audio)
+                
+                // Check for intro/outro videos first
+                const introOutro = activeItems.find(item => 
+                    item.media_type === 'intro.mp4' || item.media_type === 'outro.mp4'
+                );
+                if (introOutro) {
+                    return introOutro;
+                }
+                
+                // Check for weather maps (high priority)
+                const weatherMap = activeItems.find(item => 
+                    item.media_type === 'weather_map1' || 
+                    item.media_type === 'weather_map2' ||
+                    item.media_type.includes('weather_map1') ||
+                    item.media_type.includes('weather_map2')
+                );
+                if (weatherMap) {
+                    this.log('info', `Prioritizing weather map: ${weatherMap.media_type}`);
+                    return weatherMap;
+                }
+                
+                // Check for other visual content (cards, other videos)
+                const otherVisualMedia = activeItems.find(item => 
+                    item.media_type.startsWith('card-') ||
+                    (item.media_type.includes('.mp4') && !item.media_type.includes('intro') && !item.media_type.includes('outro')) ||
+                    (item.media_type.includes('.webm') && !item.media_type.includes('weather_map')) ||
+                    (item.media_type.startsWith('weather_') && !item.media_type.includes('weather_map'))
+                );
+                if (otherVisualMedia) {
+                    return otherVisualMedia;
+                }
+                
+                // Check for main weather audio (only if no visuals available)
+                const mainAudio = activeItems.find(item => 
+                    item.media_type === 'main_weather_audio'
+                );
+                if (mainAudio) {
+                    return mainAudio;
+                }
+                
+                // Fallback to any other audio
+                const otherAudio = activeItems.find(item => 
+                    item.media_type.includes('_audio')
+                );
+                if (otherAudio) {
+                    return otherAudio;
+                }
+                
+                // Ultimate fallback - return first item
+                return activeItems[0];
+            }
+            
+            duckBackgroundMusic() {
+                // Smoothly reduce background music to 7% when main audio plays
+                if (this.backgroundAudio.src) {
+                    this.log('info', 'Ducking background music to 7%');
+                    this.backgroundVolume.value = 7;
+                    this.updateVolume('background', 7);
+                    document.getElementById('backgroundVolumeValue').textContent = '7%';
+                } else {
+                    this.log('info', 'No background music to duck');
+                }
+            }
+            
+            restoreBackgroundMusic() {
+                // Restore background music to 100% when main audio ends
+                if (this.backgroundAudio.src) {
+                    this.log('info', 'Restoring background music to 100%');
+                    this.backgroundVolume.value = 100;
+                    this.updateVolume('background', 100);
+                    document.getElementById('backgroundVolumeValue').textContent = '100%';
+                } else {
+                    this.log('info', 'No background music to restore');
+                }
+            }
+            
+            handleBackgroundMusicFade() {
+                // Simplified background music handling - just duck when main audio is playing
+                const mainAudioActive = Array.from(this.activeMedia).some(item => 
+                    item.media_type === 'main_weather_audio'
+                );
+                
+                if (mainAudioActive && !this.backgroundFadeStarted) {
+                    this.duckBackgroundMusic();
+                    this.backgroundFadeStarted = true;
+                } else if (!mainAudioActive && this.backgroundFadeStarted) {
+                    this.restoreBackgroundMusic();
+                    this.backgroundFadeStarted = false;
+                }
+            }
+        }
+        
+        // Initialize the player when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            window.weatherPlayer = new WeatherMediaPlayer();
+        });
+        
+        // Handle any unhandled errors
+        window.addEventListener('error', (event) => {
+            if (window.weatherPlayer) {
+                window.weatherPlayer.log('error', `Unhandled error: ${event.error.message}`);
+            }
+        });
+    </script>
+</body>
+</html>
