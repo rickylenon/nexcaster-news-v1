@@ -1,0 +1,4 @@
+python inference.py --checkpoint_path checkpoints/wav2lip.pth --face media/newscaster_01.mp4 --audio media/opening_greeting_0.mp3
+
+
+python wav2lip_test/Wav2Lip/inference_chunked.py --checkpoint_path checkpoints/wav2lip.pth --face test_video_newscaster.mp4 --audio test_audio_newscaster.mp3 --outfile results/result_sync.mp4 --wav2lip_batch_size 4 --resize_factor 2 --chunk_size 25
