@@ -101,24 +101,101 @@
             width: 100%;
             aspect-ratio: 16 / 9;
             max-height: 600px;
-            background: #000;
+            background: #38d21c;
             border-radius: 0;
             overflow: hidden;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: row;
         }
 
-        .main-video {
-            width: 100%;
+        .media-left, .media-right {
+            width: 50%;
             height: 100%;
-            object-fit: contain;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .media-left{
+            background-color: #000;
+            position: relative;
         }
 
-        .main-image {
+        .media-left.full-width {
+            width: 100% !important;
+        }
+
+        .media-right.hidden {
+            width: 0% !important;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        .main-video, .main-image {
             width: 100%;
             height: 100%;
             object-fit: cover;
             display: none;
             transition: opacity 0.5s ease-in-out;
+        }
+        .main-image {
+            object-fit: contain;
+            position: relative;
+            z-index: 2;
+        }
+
+        .media-left-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            filter: blur(8px);
+            opacity: 0.6;
+            z-index: 1;
+            transition: background-image 0.5s ease-in-out;
+        }
+
+        /* Overlay video container */
+        .overlay-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .overlay-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+
+        .overlay-video.anchor {
+            /* No filter, just a border if you want */
+        }
+
+        /* Animation for overlay video appearance */
+        .overlay-video {
+            animation: fadeInOverlay 0.5s ease-in-out;
+        }
+
+        @keyframes fadeInOverlay {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
 
         /* Ken Burns Effect Animations */
@@ -202,6 +279,7 @@
             padding: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             animation: slideInUp 0.5s ease-out;
+            z-index: 2;
         }
 
         @keyframes slideInUp {
@@ -337,6 +415,29 @@
             padding: 20px;
             border-radius: 0;
             margin-bottom: 20px;
+        }
+
+        .anchor-toggle {
+            background: rgba(52, 152, 219, 0.2);
+            border: 1px solid rgba(52, 152, 219, 0.5);
+            padding: 8px 12px;
+            border-radius: 0;
+            color: white;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .anchor-toggle:hover {
+            background: rgba(52, 152, 219, 0.3);
+        }
+
+        .anchor-toggle.active {
+            background: rgba(52, 152, 219, 0.4);
+            border-color: #3498db;
         }
 
         .control-buttons {
@@ -648,11 +749,16 @@
 
         <div class="main-content">
             <div class="media-stage">
-                <video id="mainVideo" class="main-video" preload="metadata" muted>
-                    Your browser does not support the video tag.
-                </video>
-                
-                <img id="mainImage" class="main-image" alt="News Image">
+                <div class="media-left">
+                    <div class="media-left-background"></div>
+                    <video id="mainVideo" class="main-video" preload="metadata" muted>
+                        Your browser does not support the video tag.
+                    </video>
+                    <img id="mainImage" class="main-image" alt="News Image">
+                </div>
+                <div class="media-right">
+                    <video id="overlayVideo" class="overlay-video" preload="metadata" muted></video>
+                </div>
 
                 <!-- Channel Branding -->
                 <div class="channel-branding left">
@@ -705,6 +811,12 @@
                 </button>
                 <button id="debugBtn" class="btn">
                     <span>🐛</span> Toggle Debug
+                </button>
+                <button id="anchorToggle" class="anchor-toggle">
+                    <span>🎬</span> Anchor Videos
+                </button>
+                <button id="overlayToggle" class="anchor-toggle">
+                    <span>🖼️</span> Overlay Mode
                 </button>
             </div>
 
@@ -782,6 +894,7 @@
                 this.segmentAudio = document.getElementById('segmentAudio');
                 this.mainVideo = document.getElementById('mainVideo');
                 this.mainImage = document.getElementById('mainImage');
+                this.overlayVideo = document.getElementById('overlayVideo');
                 
                 // Control elements
                 this.playBtn = document.getElementById('playBtn');
@@ -789,6 +902,8 @@
                 this.stopBtn = document.getElementById('stopBtn');
                 this.reloadBtn = document.getElementById('reloadBtn');
                 this.debugBtn = document.getElementById('debugBtn');
+                this.anchorToggle = document.getElementById('anchorToggle');
+                this.overlayToggle = document.getElementById('overlayToggle');
                 
                 // Timeline elements
                 this.timelineBar = document.getElementById('timelineBar');
@@ -817,6 +932,11 @@
                 this.backgroundFadeStarted = false;
                 this.backgroundFadeStartTime = null;
                 
+                // Anchor video settings
+                this.anchorVideosEnabled = true;
+                this.overlayModeEnabled = true;
+                this.currentAnchorVideo = null;
+                
                 this.init();
             }
             
@@ -829,6 +949,13 @@
                     this.setupAudioElements();
                     this.populatePlaylist();
                     this.updateStatus('ready');
+                    
+                    // Initialize toggle states
+                    this.anchorToggle.classList.add('active');
+                    this.anchorToggle.innerHTML = '<span>🎬</span> Anchor Videos ON';
+                    this.overlayToggle.classList.add('active');
+                    this.overlayToggle.innerHTML = '<span>🖼️</span> Overlay ON';
+                    
                     this.log('info', 'Player initialized successfully!');
                 } catch (error) {
                     this.log('error', `Initialization failed: ${error.message}`);
@@ -845,11 +972,19 @@
                 this.stopBtn.addEventListener('click', () => this.stop());
                 this.reloadBtn.addEventListener('click', () => this.reload());
                 this.debugBtn.addEventListener('click', () => this.toggleDebug());
+                this.anchorToggle.addEventListener('click', () => this.toggleAnchorVideos());
+                this.overlayToggle.addEventListener('click', () => this.toggleOverlayMode());
                 
                 // Keyboard shortcuts for debugging
                 document.addEventListener('keydown', (e) => {
                     if (e.key === 'd' || e.key === 'D') {
                         this.dumpTimingState();
+                    }
+                    if (e.key === 'a' || e.key === 'A') {
+                        this.toggleAnchorVideos();
+                    }
+                    if (e.key === 'o' || e.key === 'O') {
+                        this.toggleOverlayMode();
                     }
                 });
                 
@@ -1219,6 +1354,7 @@
                 // Hide media elements
                 this.mainVideo.style.display = 'none';
                 this.mainImage.style.display = 'none';
+                this.overlayVideo.style.display = 'none';
                 
                 // Reset UI
                 this.playBtn.disabled = false;
@@ -1352,13 +1488,17 @@
                     this.log('info', `🖼️ Processing ${segment.media.length} media items for "${segment.display_name}"`);
                     await this.displaySegmentMedia(segment);
                     
-                    // Start image rotation if segment has multiple images
+                    // Start image rotation if segment has multiple images (and no anchor video is playing)
                     const images = segment.media.filter(m => m.image);
-                    if (images.length > 1) {
+                    const anchorVideos = segment.media.filter(m => m.type === 'anchor_video');
+                    
+                    if (images.length > 1 && (!this.anchorVideosEnabled || anchorVideos.length === 0)) {
                         this.log('info', `🔄 Starting image rotation: ${images.length} images for "${segment.display_name}"`);
                         this.startImageRotation(segment, images);
-                    } else if (images.length === 1) {
+                    } else if (images.length === 1 && (!this.anchorVideosEnabled || anchorVideos.length === 0)) {
                         this.log('info', `🖼️ Single image display for "${segment.display_name}": ${images[0].image}`);
+                    } else if (anchorVideos.length > 0 && this.anchorVideosEnabled) {
+                        this.log('info', `🎬 Anchor video playing for "${segment.display_name}" - no image rotation needed`);
                     }
                 } else {
                     // Hide media if no media for this segment (e.g., summary_opening)
@@ -1402,6 +1542,9 @@
                 // Clear image rotation and Ken Burns effects when segment ends
                 this.clearImageRotation();
                 this.clearImageKenBurns();
+                
+                // Hide overlay video when segment ends
+                this.overlayVideo.style.display = 'none';
                 
                 this.log('info', `✅ Segment "${segment.display_name}" deactivated successfully`);
             }
@@ -1465,6 +1608,11 @@
                     this.imageRotationInterval = null;
                     this.log('info', `🛑 Image rotation cleared at ${this.formatTime(clearTime)}`);
                 }
+                // Clear background image
+                const backgroundElement = document.querySelector('.media-left-background');
+                if (backgroundElement) {
+                    backgroundElement.style.backgroundImage = 'none';
+                }
             }
             
             applyKenBurnsEffect() {
@@ -1488,85 +1636,99 @@
             
             async displaySegmentMedia(segment) {
                 const displayTime = this.newsAudio.currentTime;
-                
+                const mediaLeft = document.querySelector('.media-left');
+                const mediaRight = document.querySelector('.media-right');
+                // Clear any previous image rotation
+                this.clearImageRotation();
                 if (!segment.media || segment.media.length === 0) {
                     // No media for this segment - hide both video and image
                     this.mainVideo.style.display = 'none';
                     this.mainImage.style.display = 'none';
+                    this.overlayVideo.style.display = 'none';
+                    mediaLeft.classList.add('full-width');
+                    mediaRight.classList.add('hidden');
                     this.clearImageKenBurns();
                     this.log('info', `📺 No media to display for segment: "${segment.display_name}" at ${this.formatTime(displayTime)}`);
                     return;
                 }
-                
                 this.log('info', `🖼️ DISPLAYING MEDIA for "${segment.display_name}" at ${this.formatTime(displayTime)}`);
                 this.log('info', `📊 Media inventory: ${segment.media.length} total items`);
-                
-                // Prioritize videos first, then images
-                const videos = segment.media.filter(m => m.video);
+                // Separate anchor videos from other media
+                const anchorVideos = segment.media.filter(m => m.type === 'anchor_video');
+                const otherVideos = segment.media.filter(m => m.video && m.type !== 'anchor_video');
                 const images = segment.media.filter(m => m.image);
-                
-                this.log('info', `📹 Videos: ${videos.length} | 🖼️ Images: ${images.length}`);
-                
-                if (videos.length > 0) {
-                    // Display first video
-                    const media = videos[0];
-                    this.log('info', `🎬 Switching to VIDEO mode: "${media.video}"`);
-                    this.clearImageKenBurns();
-                    this.mainImage.style.display = 'none';
-                    this.mainVideo.style.display = 'block';
-                    
-                    // Check if this is an intro or outro segment for looping
-                    const isIntroOrOutro = segment._isOutro || 
-                                         segment.name === 'intro' || 
-                                         segment.name === 'opening_greeting' ||
-                                         segment.display_name.toLowerCase().includes('intro') ||
-                                         segment.display_name.toLowerCase().includes('outro');
-                    
-                    if (isIntroOrOutro) {
-                        this.mainVideo.loop = true;
-                        this.log('info', `🔄 Video loop enabled for intro/outro segment: "${segment.display_name}"`);
-                    } else {
-                        this.mainVideo.loop = false;
-                        this.log('info', `📹 Video loop disabled for regular segment: "${segment.display_name}"`);
+                // Always show anchor video on the right, main media on the left
+                // 1. Anchor video (right)
+                if (anchorVideos.length > 0) {
+                    let anchor = anchorVideos[0];
+                    let anchorPath = anchor.path;
+                    if (!anchorPath.startsWith('/')) {
+                        anchorPath = anchorPath.startsWith('generated/anchor/') ? '/' + anchorPath : '/generated/anchor/' + anchorPath;
                     }
-                    
-                    // Ensure absolute path for video
-                    let videoPath = media.path;
-                    if (!videoPath.startsWith('/')) {
-                        // If path starts with 'media/', use it as-is with leading slash
-                        // Otherwise assume it's just a filename and prepend '/media/'
-                        videoPath = videoPath.startsWith('media/') ? '/' + videoPath : '/media/' + videoPath;
-                    }
-                    
-                    this.log('info', `📹 Loading video: ${videoPath}`);
-                    this.mainVideo.src = videoPath;
-                    await this.mainVideo.play();
-                    this.log('info', `✅ Video playing: "${media.video}" at ${this.formatTime(this.newsAudio.currentTime)}`);
-                    
-                } else if (images.length > 0) {
-                    // Always start with the first image when segment begins
-                    this.currentImageIndex = 0;
-                    const selectedImage = images[0];
-                    
-                    this.log('info', `🖼️ Switching to IMAGE mode: "${selectedImage.image}" (1 of ${images.length})`);
-                    this.mainVideo.style.display = 'none';
-                    this.mainImage.style.display = 'block';
-                    
-                    // Ensure absolute path for image
-                    let imagePath = selectedImage.path;
-                    if (!imagePath.startsWith('/')) {
-                        // If path starts with 'media/', use it as-is with leading slash
-                        // Otherwise assume it's just a filename and prepend '/media/'
-                        imagePath = imagePath.startsWith('media/') ? '/' + imagePath : '/media/' + imagePath;
-                    }
-                    
-                    this.log('info', `🖼️ Loading image: ${imagePath}`);
-                    this.mainImage.src = imagePath;
-                    this.applyKenBurnsEffect();
-                    this.log('info', `✅ Image displayed with Ken Burns effect: "${selectedImage.image}" at ${this.formatTime(this.newsAudio.currentTime)}`);
+                    this.overlayVideo.style.display = 'block';
+                    this.overlayVideo.classList.add('anchor');
+                    this.overlayVideo.src = anchorPath;
+                    await this.overlayVideo.play();
+                    this.log('info', `🎬 Anchor video (right) playing: "${anchor.video}"`);
+                    mediaLeft.classList.remove('full-width');
+                    mediaRight.classList.remove('hidden');
                 } else {
-                    this.log('warning', `⚠️ No displayable media found for "${segment.display_name}" - hiding all media elements`);
-                    this.clearImageKenBurns();
+                    this.overlayVideo.style.display = 'none';
+                    mediaLeft.classList.add('full-width');
+                    mediaRight.classList.add('hidden');
+                }
+                // 2. Main media (left): prefer non-anchor video, then image(s)
+                if (otherVideos.length > 0) {
+                    let mainVid = otherVideos[0];
+                    let mainVidPath = mainVid.path;
+                    if (!mainVidPath.startsWith('/')) {
+                        mainVidPath = mainVidPath.startsWith('media/') ? '/' + mainVidPath : '/media/' + mainVidPath;
+                    }
+                    this.mainVideo.style.display = 'block';
+                    this.mainVideo.src = mainVidPath;
+                    // Loop for intro, outro, or any media video
+                    const isLoop = segment.name === 'intro' || segment.name === 'outro' || segment.segment_type === 'opening_greeting' || segment.segment_type === 'closing_remarks';
+                    this.mainVideo.loop = isLoop || true; // Always loop media videos
+                    await this.mainVideo.play();
+                    this.mainImage.style.display = 'none';
+                    this.log('info', `📹 Main video (left) playing: "${mainVid.video}"`);
+                } else if (images.length > 1) {
+                    // Slideshow/rotation for multiple images
+                    this.currentImageIndex = 0;
+                    const showImage = (idx) => {
+                        const img = images[idx];
+                        let imgPath = img.path;
+                        if (!imgPath.startsWith('/')) {
+                            imgPath = imgPath.startsWith('media/') ? '/' + imgPath : '/media/' + imgPath;
+                        }
+                        // Set background image (blurred)
+                        const backgroundElement = document.querySelector('.media-left-background');
+                        backgroundElement.style.backgroundImage = `url('${imgPath}')`;
+                        // Set foreground image
+                        this.mainImage.style.display = 'block';
+                        this.mainImage.src = imgPath;
+                        this.applyKenBurnsEffect();
+                        this.mainVideo.style.display = 'none';
+                        this.log('info', `🖼️ Main image (left) showing: "${img.image}" (${idx+1}/${images.length})`);
+                    };
+                    showImage(0);
+                    const interval = Math.max(3000, Math.min(15000, (segment.duration * 1000) / images.length));
+                    this.imageRotationInterval = setInterval(() => {
+                        this.currentImageIndex = (this.currentImageIndex + 1) % images.length;
+                        showImage(this.currentImageIndex);
+                    }, interval);
+                } else if (images.length === 1) {
+                    let img = images[0];
+                    let imgPath = img.path;
+                    if (!imgPath.startsWith('/')) {
+                        imgPath = imgPath.startsWith('media/') ? '/' + imgPath : '/media/' + imgPath;
+                    }
+                    this.mainImage.style.display = 'block';
+                    this.mainImage.src = imgPath;
+                    this.applyKenBurnsEffect();
+                    this.mainVideo.style.display = 'none';
+                    this.log('info', `🖼️ Main image (left) showing: "${img.image}"`);
+                } else {
                     this.mainVideo.style.display = 'none';
                     this.mainImage.style.display = 'none';
                 }
@@ -1748,6 +1910,46 @@
                 }
             }
             
+            toggleAnchorVideos() {
+                this.anchorVideosEnabled = !this.anchorVideosEnabled;
+                
+                if (this.anchorVideosEnabled) {
+                    this.anchorToggle.classList.add('active');
+                    this.anchorToggle.innerHTML = '<span>🎬</span> Anchor Videos ON';
+                    this.log('info', 'Anchor videos enabled');
+                } else {
+                    this.anchorToggle.classList.remove('active');
+                    this.anchorToggle.innerHTML = '<span>🎬</span> Anchor Videos OFF';
+                    this.log('info', 'Anchor videos disabled');
+                }
+                
+                // Refresh current segment media if playing
+                if (this.activeSegment && this.isPlaying) {
+                    this.log('info', `🔄 Refreshing media display for "${this.activeSegment.display_name}"`);
+                    this.displaySegmentMediaForActiveSegment(this.activeSegment);
+                }
+            }
+            
+            toggleOverlayMode() {
+                this.overlayModeEnabled = !this.overlayModeEnabled;
+                
+                if (this.overlayModeEnabled) {
+                    this.overlayToggle.classList.add('active');
+                    this.overlayToggle.innerHTML = '<span>🖼️</span> Overlay ON';
+                    this.log('info', 'Overlay mode enabled');
+                } else {
+                    this.overlayToggle.classList.remove('active');
+                    this.overlayToggle.innerHTML = '<span>🖼️</span> Overlay OFF';
+                    this.log('info', 'Overlay mode disabled');
+                }
+                
+                // Refresh current segment media if playing
+                if (this.activeSegment && this.isPlaying) {
+                    this.log('info', `🔄 Refreshing media display for "${this.activeSegment.display_name}"`);
+                    this.displaySegmentMediaForActiveSegment(this.activeSegment);
+                }
+            }
+            
             showLoading() {
                 this.loadingOverlay.classList.add('active');
             }
@@ -1819,6 +2021,14 @@
                     this.log('info', `⏱️ Progress: ${this.formatTime(timeIntoSegment)} into segment`);
                     this.log('info', `⏳ Remaining: ${this.formatTime(timeRemaining)} left in segment`);
                     this.log('info', `🖼️ Media: ${segment.media ? segment.media.length : 0} items`);
+                    
+                    // Anchor video status
+                    const anchorVideos = segment.media ? segment.media.filter(m => m.type === 'anchor_video') : [];
+                    this.log('info', `🎬 Anchor videos: ${anchorVideos.length} available | Enabled: ${this.anchorVideosEnabled}`);
+                    this.log('info', `🖼️ Overlay mode: ${this.overlayModeEnabled ? 'ON' : 'OFF'}`);
+                    if (this.currentAnchorVideo) {
+                        this.log('info', `🎬 Current anchor video: "${this.currentAnchorVideo.video}"`);
+                    }
                     
                     if (segment.media && segment.media.length > 1) {
                         this.log('info', `🔄 Image rotation: ${this.imageRotationInterval ? 'Active' : 'Inactive'}`);

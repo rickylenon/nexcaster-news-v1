@@ -126,3 +126,5 @@ miniforge3-23.11.0-0.tar.bz2
 *.m4a
 
 wav2lip_test/
+multitalk/
+LatentSync

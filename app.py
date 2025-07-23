@@ -413,14 +413,42 @@ def get_news_manifest():
             with open(manifest_path, 'r', encoding='utf-8') as f:
                 manifest = json.load(f)
             
+            # Check for anchor videos and add them to segments
+            anchor_dir = os.path.join(GENERATED_FOLDER, 'anchor')
+            anchor_videos = {}
+            if os.path.exists(anchor_dir):
+                for filename in os.listdir(anchor_dir):
+                    if filename.endswith('.mp4'):
+                        # Extract base name without extension
+                        base_name = filename[:-4]  # Remove .mp4
+                        anchor_videos[base_name] = {
+                            'video': filename,
+                            'path': f'/generated/anchor/{filename}',
+                            'type': 'anchor_video'
+                        }
+            
+            # Add anchor videos to segments
+            segments = manifest.get('individual_segments', [])
+            for segment in segments:
+                audio_file = segment.get('audio_file', '')
+                if audio_file:
+                    # Remove .mp3 extension to match anchor video names
+                    base_audio_name = audio_file[:-4] if audio_file.endswith('.mp3') else audio_file
+                    if base_audio_name in anchor_videos:
+                        # Add anchor video to segment media
+                        if 'media' not in segment:
+                            segment['media'] = []
+                        segment['media'].append(anchor_videos[base_audio_name])
+                        print(f"✅ Added anchor video for segment: {segment.get('display_name', 'Unknown')}")
+            
             # Add API metadata
             manifest['api_metadata'] = {
                 'served_at': datetime.now().isoformat(),
                 'server': 'Nexcaster News API v1.0',
-                'endpoint': '/api/news/manifest'
+                'endpoint': '/api/news/manifest',
+                'anchor_videos_found': len(anchor_videos)
             }
             
-            segments = manifest.get('individual_segments', [])
             segment_types = {}
             for segment in segments:
                 segment_type = segment.get('segment_type', 'unknown')
@@ -438,6 +466,7 @@ def get_news_manifest():
             print(f"✅ Served news manifest with {len(segments)} segments:")
             for segment_type, count in segment_types.items():
                 print(f"   - {segment_type}: {count}")
+            print(f"🎬 Found {len(anchor_videos)} anchor videos")
             
             return jsonify(manifest)
         else:
