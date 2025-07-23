@@ -2,6 +2,9 @@
 """
 Step 3: TTS (Text-to-Speech) Generator
 This script generates audio files from news_scripts.json using OpenAI TTS
+
+python step3_tts_generator.py # will regenerate audio files
+python step3_tts_generator.py --combine-only # will skip regeneration of audio files
 """
 
 import os

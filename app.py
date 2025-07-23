@@ -544,6 +544,21 @@ def serve_generated_files(filename):
             'timestamp': datetime.now().isoformat()
         }), 404
 
+@app.route('/weather/generated/audio/<path:filename>')
+def serve_weather_audio(filename):
+    print(f"[DEBUG] Serving weather audio: {filename}")
+    return send_from_directory('weather/generated/audio', filename)
+
+@app.route('/weather/generated/<path:filename>')
+def serve_weather_generated(filename):
+    print(f"[DEBUG] Serving weather generated file: {filename}")
+    return send_from_directory('weather/generated', filename)
+
+@app.route('/weather/generated/media/<path:filename>')
+def serve_weather_media(filename):
+    print(f"[DEBUG] Serving weather media: {filename}")
+    return send_from_directory('weather/generated/media', filename)
+
 if __name__ == '__main__':
     print("🚀 Starting Nexcaster News App...")
     print(f"📁 Upload folder: {UPLOAD_FOLDER}")

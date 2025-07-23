@@ -1017,6 +1017,8 @@
                     
                     const apiResponse = await response.json();
                     this.manifest = apiResponse.manifest || apiResponse; // Handle API wrapper
+
+                    this.log('info', '📊 Manifest: ' + JSON.stringify(this.manifest, null, 2));
                     
                     // Process segments from manifest using pre-calculated timing
                     this.segments = [];
