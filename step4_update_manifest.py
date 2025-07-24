@@ -2,10 +2,13 @@
 """
 Step 4: Update News Manifest with Media
 This script updates news_manifest.json to add relevant media based on news_data.json
+
+python step4_update_manifest.py --add-weather
 """
 
 import os
 import json
+import sys
 
 def load_news_data():
     """Load news data from generated/news_data.json"""
@@ -33,6 +36,62 @@ def load_manifest():
     
     print(f"Loaded manifest with {len(data['individual_segments'])} segments")
     return data
+
+def make_weather_abs_path(path):
+    if path.startswith('/'):
+        return path
+    if path.startswith('generated/'):
+        return f"/weather/{path}"
+    return f"/weather/generated/{path}"
+
+def format_weather_segment(seg):
+    """Format a weather segment to match the required manifest format for the player."""
+    # Ensure audio_path is absolute and correct
+    seg['audio_path'] = make_weather_abs_path(seg['audio_path'])
+    # Ensure media array exists
+    if 'media' not in seg or not isinstance(seg['media'], list):
+        seg['media'] = []
+    # Make all media.path absolute and correct
+    for m in seg['media']:
+        if 'path' in m:
+            m['path'] = make_weather_abs_path(m['path'])
+    # Ensure headline is an object
+    headline_text = seg.get('headline', seg.get('display_name', 'Weather'))
+    seg['headline'] = {
+        "text": headline_text if isinstance(headline_text, str) else str(headline_text),
+        "location": "Pulilan, Bulacan",
+        "category": "Weather",
+        "priority": "normal",
+        "timestamp": "LIVE"
+    }
+    return seg
+
+def load_weather_segments():
+    """Load and extract required weather segments from weather/generated/weather_manifest.json, formatted for the player."""
+    weather_manifest_path = os.path.join('weather', 'generated', 'weather_manifest.json')
+    if not os.path.exists(weather_manifest_path):
+        print(f"Error: {weather_manifest_path} not found!")
+        return []
+    with open(weather_manifest_path, 'r', encoding='utf-8') as f:
+        weather_data = json.load(f)
+    print(f"Loaded weather manifest with {len(weather_data['individual_segments'])} segments")
+    # List of required segment_types
+    required_types = [
+        'weather_overview',
+        'weather_current_overview',
+        'card_wind',
+        'weather_map1',
+        'weather_map2',
+        'card_temperature',
+        'card_feels_like',
+        'card_current',
+        'card_hourly',
+    ]
+    selected_segments = [format_weather_segment(seg) for seg in weather_data['individual_segments'] if seg['segment_type'] in required_types]
+    print(f"Extracted {len(selected_segments)} required weather segments:")
+    for seg in selected_segments:
+        print(f"  - {seg['display_name']} ({seg['segment_type']})")
+    return selected_segments
 
 def map_media_to_segments(manifest, news_data):
     """Map media from news_data to manifest segments"""
@@ -188,6 +247,32 @@ def map_media_to_segments(manifest, news_data):
     
     return manifest
 
+def insert_weather_segments(manifest, weather_segments):
+    """Insert weather segments after the last news segment and before closing remarks."""
+    segments = manifest['individual_segments']
+    # Find index of last news segment
+    last_news_idx = -1
+    for i, seg in enumerate(segments):
+        if seg['segment_type'] == 'news':
+            last_news_idx = i
+    if last_news_idx == -1:
+        print("Warning: No news segment found. Appending weather segments before closing remarks.")
+        # Try to insert before closing_remarks
+        for i, seg in enumerate(segments):
+            if seg['segment_type'] == 'closing_remarks':
+                last_news_idx = i - 1
+                break
+        if last_news_idx == -1:
+            print("Warning: No closing_remarks found. Appending weather segments at end.")
+            last_news_idx = len(segments) - 1
+    # Insert weather segments after last_news_idx
+    insert_pos = last_news_idx + 1
+    print(f"Inserting weather segments at position {insert_pos}")
+    new_segments = segments[:insert_pos] + weather_segments + segments[insert_pos:]
+    manifest['individual_segments'] = new_segments
+    print(f"Manifest now has {len(new_segments)} segments after weather insertion.")
+    return manifest
+
 def save_updated_manifest(manifest):
     """Save updated manifest back to file"""
     manifest_path = os.path.join('generated', 'news_manifest.json')
@@ -213,30 +298,42 @@ def print_media_summary(manifest):
                 print(f"  🖼️  {media['image'][:40]}... ({media['type']})")
 
 def main():
-    """Main function to update manifest with media"""
+    """Main function to update manifest with media and optionally add weather segments"""
     print("=== Nexcaster News Manifest Media Updater ===")
     print("Step 4: Adding media mappings to news manifest")
     print()
-    
+
+    # CLI argument parsing
+    add_weather = False
+    if '--add-weather' in sys.argv:
+        add_weather = True
+        print("[CLI] --add-weather flag detected. Will insert weather segments.")
+
     # Load news data
     news_data = load_news_data()
     if not news_data:
         return
-    
+
     # Load current manifest
     manifest = load_manifest()
     if not manifest:
         return
-    
+
     # Map media to segments
     updated_manifest = map_media_to_segments(manifest, news_data)
-    
+
+    # If --add-weather, load and insert weather segments
+    if add_weather:
+        weather_segments = load_weather_segments()
+        updated_manifest = insert_weather_segments(updated_manifest, weather_segments)
+        print("[INFO] Weather segments inserted into manifest.")
+
     # Save updated manifest
     save_updated_manifest(updated_manifest)
-    
+
     # Print summary
     print_media_summary(updated_manifest)
-    
+
     print(f"\n🎯 Media mapping complete!")
     print(f"All segments now have appropriate media assignments.")
 

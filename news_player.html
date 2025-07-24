@@ -136,9 +136,13 @@
         .main-video, .main-image {
             width: 100%;
             height: 100%;
-            object-fit: cover;
             display: none;
             transition: opacity 0.5s ease-in-out;
+        }
+        .main-video {
+            object-fit: cover;
+            position: relative;
+            z-index: 2;
         }
         .main-image {
             object-fit: contain;
@@ -224,37 +228,37 @@
         /* Ken Burns Keyframes - Various panning and zooming effects */
         @keyframes kenBurns1 {
             0% {
-                transform: scale(1.1) translate(0%, 0%);
+                transform: scale(1.12) translate(0%, 0%);
             }
             100% {
-                transform: scale(1.3) translate(-2%, -2%);
+                transform: scale(1.0) translate(-1%, -1%);
             }
         }
 
         @keyframes kenBurns2 {
             0% {
-                transform: scale(1.2) translate(2%, 0%);
+                transform: scale(1.10) translate(2%, 0%);
             }
             100% {
-                transform: scale(1.1) translate(-1%, -3%);
+                transform: scale(1.0) translate(0%, -1%);
             }
         }
 
         @keyframes kenBurns3 {
             0% {
-                transform: scale(1.0) translate(-2%, 2%);
+                transform: scale(1.13) translate(-2%, 2%);
             }
             100% {
-                transform: scale(1.25) translate(1%, -1%);
+                transform: scale(1.0) translate(1%, 0%);
             }
         }
 
         @keyframes kenBurns4 {
             0% {
-                transform: scale(1.15) translate(1%, -2%);
+                transform: scale(1.11) translate(1%, -2%);
             }
             100% {
-                transform: scale(1.05) translate(-2%, 1%);
+                transform: scale(1.0) translate(-1%, 1%);
             }
         }
 
@@ -883,6 +887,7 @@
                 this.debugMode = false;
                 this.isLoading = false;
                 this.pendingMediaSegment = null; // Track segments waiting for media display
+                this.currentSegmentIndex = 0; // Ensure always initialized
                 
                 // Media rotation
                 this.imageRotationInterval = null;
@@ -999,7 +1004,7 @@
                 
                 // Audio event listeners
                 this.newsAudio.addEventListener('timeupdate', () => this.updatePlayback());
-                this.newsAudio.addEventListener('ended', () => this.handlePlaybackEnd());
+                this.newsAudio.addEventListener('ended', () => this.handleSegmentEnd());
                 this.newsAudio.addEventListener('loadstart', () => this.log('info', 'Audio loading started'));
                 this.newsAudio.addEventListener('canplaythrough', () => this.log('info', 'Audio ready for playback'));
                 
@@ -1135,26 +1140,14 @@
             
             setupAudioElements() {
                 this.log('info', 'Setting up audio elements...');
-                
-                // Set up main news audio (combined file)
-                if (this.manifest.combined_audio) {
-                    // Ensure absolute path for audio
-                    const audioPath = this.manifest.combined_audio.combined_path.startsWith('/') 
-                        ? this.manifest.combined_audio.combined_path 
-                        : '/' + this.manifest.combined_audio.combined_path;
-                    this.newsAudio.src = audioPath;
-                    this.log('info', `Main news audio set: ${audioPath}`);
-                }
-                
-                // Set up background music if available (graceful fallback)
+                // Remove combined audio logic
+                // Only set up background music if available
                 this.setupBackgroundMusic();
-                
                 // Apply initial volume settings
                 this.updateVolume('news', this.newsAudioVolume.value);
                 this.updateVolume('background', this.backgroundVolume.value);
                 this.updateVolume('video', this.videoVolume.value);
                 this.updateVolume('master', this.masterVolume.value);
-                
                 this.updateStatus('audio', 'ready');
                 this.updateStatus('media', 'ready');
                 this.log('info', 'Audio elements setup complete');
@@ -1258,47 +1251,16 @@
             
             async play() {
                 this.log('info', '▶️ STARTING PLAYBACK...');
-                
                 try {
                     this.isLoading = true;
                     this.playBtn.disabled = true;
                     this.pauseBtn.disabled = false;
                     this.stopBtn.disabled = false;
-                    
-                    // Log current position
-                    const startTime = this.newsAudio.currentTime;
-                    this.log('info', `📍 Starting from: ${this.formatTime(startTime)} / ${this.formatTime(this.totalDuration)}`);
-                    
-                    // Ensure news audio is ready
-                    if (this.newsAudio.readyState < 3) {
-                        this.log('info', '⏳ Waiting for news audio to be ready...');
-                        await new Promise((resolve) => {
-                            const onReady = () => {
-                                this.newsAudio.removeEventListener('canplaythrough', onReady);
-                                resolve();
-                            };
-                            this.newsAudio.addEventListener('canplaythrough', onReady);
-                        });
-                    }
-                    
+                    // Play current segment
+                    await this.playSegment(this.currentSegmentIndex);
                     this.isPlaying = true;
                     this.isLoading = false;
-                    
-                    await this.newsAudio.play();
-                    this.log('info', `🎵 News audio started at ${this.formatTime(this.newsAudio.currentTime)}`);
-                    
-                    // Handle background music
-                    if (this.backgroundAudio.src) {
-                        this.backgroundAudio.currentTime = this.newsAudio.currentTime;
-                        await this.backgroundAudio.play();
-                        this.log('info', `🎵 Background music started at ${this.formatTime(this.newsAudio.currentTime)}`);
-                        
-                        // Duck background music when news audio starts
-                        this.duckBackgroundMusic();
-                    }
-                    
                     this.log('info', '✅ Playback started successfully');
-                    
                 } catch (error) {
                     this.log('error', `❌ Playback failed: ${error.message}`);
                     this.isPlaying = false;
@@ -1309,39 +1271,69 @@
                 }
             }
             
+            async playSegment(index) {
+                if (index < 0 || index >= this.segments.length) return;
+                const segment = this.segments[index];
+                if (!segment || !segment.audio_path) {
+                    this.log('error', `Segment at index ${index} is missing audio_path or is undefined!`);
+                    return;
+                }
+                this.currentSegmentIndex = index;
+                this.activeSegment = segment;
+
+                // Always pause and reset before changing src
+                this.newsAudio.pause();
+                this.newsAudio.currentTime = 0;
+                this.newsAudio.src = segment.audio_path;
+
+                try {
+                    await this.newsAudio.play();
+                    this.log('info', `🎵 Playing segment: ${segment.display_name}`);
+                } catch (err) {
+                    if (err.name === 'AbortError') {
+                        this.log('warning', `Audio play aborted for segment: ${segment.display_name}`);
+                    } else {
+                        this.log('error', `Audio play failed for segment: ${segment.display_name} - ${err.message}`);
+                    }
+                }
+
+                // Display media for this segment
+                await this.displaySegmentMediaForActiveSegment(segment);
+                // Update UI
+                this.updateTimeline();
+                this.updateActivePlaylistItems();
+                this.updateLowerThird(segment);
+                // Scroll to playlist item when play/segment click
+                const playlistItem = this.playlistContainer.querySelector(`[data-index="${index}"]`);
+                if (playlistItem) {
+                    playlistItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }
+            
             pause() {
                 this.log('info', 'Pausing playback...');
-                
                 this.isPlaying = false;
                 this.playBtn.disabled = false;
                 this.pauseBtn.disabled = true;
-                
                 this.newsAudio.pause();
                 this.backgroundAudio.pause();
                 this.segmentAudio.pause();
                 this.mainVideo.pause();
-                
                 this.log('info', 'Playback paused');
             }
             
             stop() {
                 this.log('info', 'Stopping playback...');
-                
                 this.isPlaying = false;
+                this.currentSegmentIndex = 0;
                 this.activeSegment = null;
-                this.pendingMediaSegment = null; // Clear any pending media display
-                
-                // Clear image rotation
+                this.pendingMediaSegment = null;
                 this.clearImageRotation();
-                
-                // Restore background music to 100% when stopping
                 if (this.backgroundAudio.src) {
                     this.backgroundVolume.value = 100;
                     this.updateVolume('background', 100);
                     document.getElementById('backgroundVolumeValue').textContent = '100%';
                 }
-                
-                // Stop and reset all audio/video
                 this.newsAudio.pause();
                 this.newsAudio.currentTime = 0;
                 this.backgroundAudio.pause();
@@ -1351,21 +1343,15 @@
                 this.mainVideo.pause();
                 this.mainVideo.currentTime = 0;
                 this.mainVideo.src = '';
-                this.mainVideo.loop = false; // Reset loop when stopping
-                
-                // Hide media elements
+                this.mainVideo.loop = false;
                 this.mainVideo.style.display = 'none';
                 this.mainImage.style.display = 'none';
                 this.overlayVideo.style.display = 'none';
-                
-                // Reset UI
                 this.playBtn.disabled = false;
                 this.pauseBtn.disabled = true;
                 this.stopBtn.disabled = true;
-                
                 this.updateTimeline();
                 this.clearActivePlaylistItems();
-                
                 this.log('info', 'Playback stopped');
             }
             
@@ -1549,6 +1535,11 @@
                 this.overlayVideo.style.display = 'none';
                 
                 this.log('info', `✅ Segment "${segment.display_name}" deactivated successfully`);
+                // Remove video end handler when segment ends
+                if (this._mainVideoEndHandler) {
+                    this.mainVideo.removeEventListener('ended', this._mainVideoEndHandler);
+                    this._mainVideoEndHandler = null;
+                }
             }
             
             startImageRotation(segment, images) {
@@ -1642,6 +1633,11 @@
                 const mediaRight = document.querySelector('.media-right');
                 // Clear any previous image rotation
                 this.clearImageRotation();
+                // Remove previous video end event listener if any
+                if (this._mainVideoEndHandler) {
+                    this.mainVideo.removeEventListener('ended', this._mainVideoEndHandler);
+                    this._mainVideoEndHandler = null;
+                }
                 if (!segment.media || segment.media.length === 0) {
                     // No media for this segment - hide both video and image
                     this.mainVideo.style.display = 'none';
@@ -1688,9 +1684,15 @@
                     }
                     this.mainVideo.style.display = 'block';
                     this.mainVideo.src = mainVidPath;
-                    // Loop for intro, outro, or any media video
-                    const isLoop = segment.name === 'intro' || segment.name === 'outro' || segment.segment_type === 'opening_greeting' || segment.segment_type === 'closing_remarks';
-                    this.mainVideo.loop = isLoop || true; // Always loop media videos
+                    this.mainVideo.loop = true; // Always loop media videos
+                    // Add event listener to restart video if it ends before audio
+                    this._mainVideoEndHandler = () => {
+                        if (!this.newsAudio.paused && this.newsAudio.currentTime < segment.duration) {
+                            this.mainVideo.currentTime = 0;
+                            this.mainVideo.play();
+                        }
+                    };
+                    this.mainVideo.addEventListener('ended', this._mainVideoEndHandler);
                     await this.mainVideo.play();
                     this.mainImage.style.display = 'none';
                     this.log('info', `📹 Main video (left) playing: "${mainVid.video}"`);
@@ -1730,6 +1732,7 @@
                     this.applyKenBurnsEffect();
                     this.mainVideo.style.display = 'none';
                     this.log('info', `🖼️ Main image (left) showing: "${img.image}"`);
+                    // No timer needed, just keep image displayed for segment duration
                 } else {
                     this.mainVideo.style.display = 'none';
                     this.mainImage.style.display = 'none';
@@ -1738,16 +1741,12 @@
             
             updateActivePlaylistItems() {
                 this.clearActivePlaylistItems();
-                
                 if (this.activeSegment) {
                     const index = this.segments.indexOf(this.activeSegment);
                     const playlistItem = this.playlistContainer.querySelector(`[data-index="${index}"]`);
                     if (playlistItem) {
                         playlistItem.classList.add('playing');
-                        playlistItem.scrollIntoView({ 
-                            behavior: 'smooth', 
-                            block: 'nearest' 
-                        });
+                        // Removed scrollIntoView from here to allow manual scrolling
                     }
                 }
             }
@@ -1785,13 +1784,19 @@
             }
             
             updateTimeline() {
-                if (this.totalDuration > 0) {
-                    const progress = (this.currentTime / this.totalDuration) * 100;
+                const segment = this.segments[this.currentSegmentIndex];
+                if (segment && segment.duration > 0) {
+                    const progress = (this.newsAudio.currentTime / segment.duration) * 100;
                     this.timelineProgress.style.width = `${progress}%`;
                     this.timelineMarker.style.left = `${progress}%`;
+                    this.currentTimeDisplay.textContent = this.formatTime(this.newsAudio.currentTime);
+                    this.totalTimeDisplay.textContent = this.formatTime(segment.duration);
+                } else {
+                    this.timelineProgress.style.width = '0%';
+                    this.timelineMarker.style.left = '0%';
+                    this.currentTimeDisplay.textContent = '00:00';
+                    this.totalTimeDisplay.textContent = '00:00';
                 }
-                
-                this.currentTimeDisplay.textContent = this.formatTime(this.currentTime);
             }
             
             seekToPosition(event) {
@@ -1832,9 +1837,13 @@
             }
             
             seekToSegment(index) {
-                const segment = this.segments[index];
-                if (segment) {
-                    this.seekToTime(segment.start_time);
+                if (index < 0 || index >= this.segments.length) return;
+                this.currentSegmentIndex = index;
+                this.playSegment(index);
+                // Scroll to playlist item when segment is clicked
+                const playlistItem = this.playlistContainer.querySelector(`[data-index="${index}"]`);
+                if (playlistItem) {
+                    playlistItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
             }
             
@@ -1866,13 +1875,14 @@
                 }
             }
             
-            handlePlaybackEnd() {
-                this.log('info', 'News playback ended');
-                
-                // Restore background music when news audio ends
-                this.restoreBackgroundMusic();
-                
-                this.stop();
+            handleSegmentEnd() {
+                if (this.currentSegmentIndex < this.segments.length - 1) {
+                    this.currentSegmentIndex++;
+                    this.playSegment(this.currentSegmentIndex);
+                } else {
+                    this.log('info', 'Reached end of playlist.');
+                    this.stop();
+                }
             }
             
             updateStatus(component, status = 'ready') {
