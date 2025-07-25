@@ -307,27 +307,28 @@
                     if (!response.ok) {
                         throw new Error(`Failed to load manifest: ${response.status}`);
                     }
-                    
                     const apiResponse = await response.json();
-                    this.manifest = apiResponse.manifest || apiResponse; // Handle API wrapper
-
-                    this.log('info', '📊 Manifest: ' + JSON.stringify(this.manifest, null, 2));
-                    
-                    // Process segments from manifest using pre-calculated timing
+                    let segments = [];
+                    if (Array.isArray(apiResponse)) {
+                        segments = apiResponse;
+                        this.manifest = { individual_segments: segments };
+                    } else if (Array.isArray(apiResponse.individual_segments)) {
+                        segments = apiResponse.individual_segments;
+                        this.manifest = apiResponse;
+                    } else {
+                        throw new Error('Manifest format not recognized');
+                    }
                     this.segments = [];
                     let cumulativeTime = 0;
-                    
                     this.log('info', '📊 PROCESSING MANIFEST SEGMENTS:');
-                    
-                    for (const segment of this.manifest.individual_segments) {
+                    for (const segment of segments) {
                         // Use pre-calculated timing if available, otherwise calculate
                         const startTime = segment.start_time !== undefined ? segment.start_time : cumulativeTime;
                         const endTime = segment.end_time !== undefined ? segment.end_time : startTime + segment.duration;
-                        
-                        this.log('info', `📺 Segment: "${segment.display_name}" | ${this.formatTime(startTime)}-${this.formatTime(endTime)} (${segment.duration.toFixed(3)}s) | Media: ${segment.media ? segment.media.length : 0} items`);
-                        
+                        this.log('info', `📺 Segment: "${this.getSegmentDisplayName(segment)}" | ${this.formatTime(startTime)}-${this.formatTime(endTime)} (${segment.duration.toFixed(3)}s) | Media: ${segment.media ? segment.media.length : 0} items | Anchor Video: ${segment.anchor_video || ''}`);
                         this.segments.push({
                             name: segment.segment_type,
+                            segment_index: segment.segment_index,
                             display_name: segment.display_name,
                             script: segment.script,
                             start_time: startTime,
@@ -336,11 +337,11 @@
                             audio_file: segment.audio_file,
                             audio_path: segment.audio_path,
                             media: segment.media || [],
+                            anchor_video: segment.anchor_video || '',
                             voice_used: segment.voice_used,
                             language: segment.language,
                             headline: segment.headline || null
                         });
-                        
                         cumulativeTime = endTime;
                     }
                     
@@ -369,12 +370,12 @@
             
             async setupBackgroundMusic() {
                 try {
-                    // Try to find background music file in generated/audio directory
-                    const response = await fetch('/generated/audio/background_music.mp3', { method: 'HEAD' });
+                    // Try to find background music file in media directory
+                    const response = await fetch('/media/background_music.mp3', { method: 'HEAD' });
                     if (response.ok) {
-                        this.backgroundAudio.src = '/generated/audio/background_music.mp3';
+                        this.backgroundAudio.src = '/media/background_music.mp3';
                         this.backgroundAudio.volume = 0.15; // Lower background volume (15%)
-                        this.log('info', 'Background music set: /generated/audio/background_music.mp3');
+                        this.log('info', 'Background music set: /media/background_music.mp3');
                     } else {
                         throw new Error('Background music not found');
                     }
@@ -391,10 +392,10 @@
             
             async checkAndAddOutroSegment(startTime) {
                 try {
-                    const response = await fetch('/generated/audio/outro.mp3', { method: 'HEAD' });
+                    const response = await fetch('/media/outro.mp3', { method: 'HEAD' });
                     if (response.ok) {
                         // Create a fake audio element to get duration
-                        const audio = new Audio('/generated/audio/outro.mp3');
+                        const audio = new Audio('/media/outro.mp3');
                         await new Promise((resolve) => {
                             audio.addEventListener('loadedmetadata', resolve);
                         });
@@ -411,7 +412,7 @@
                             end_time: startTime + outroDuration,
                             duration: outroDuration,
                             audio_file: 'outro.mp3',
-                            audio_path: '/generated/audio/outro.mp3',
+                            audio_path: '/media/outro.mp3',
                             media: [],
                             voice_used: 'outro',
                             language: 'en',
@@ -501,27 +502,16 @@
             }
             
             getSegmentDisplayName(segment) {
-                const icons = {
-                    'outro': '🎬',
-                    'opening_greeting': '👋',
-                    'summary_opening': '📰',
-                    'summary1': '🔥',
-                    'summary2': '🔥',
-                    'summary3': '🔥',
-                    'news1': '📄',
-                    'news2': '📄',
-                    'news3': '📄',
-                    'closing_remarks': '👋'
-                };
-                
-                // Handle dynamic summary segments (summary4, summary5, etc.)
-                if (segment.name.startsWith('summary') && segment.name !== 'summary_opening') {
-                    const icon = '🔥'; // Headline fire emoji for all summary segments
-                    return `${icon} ${segment.display_name}`;
+                if (segment.display_name && segment.display_name !== 'undefined') {
+                    return segment.display_name;
+                } else if (segment.segment_index) {
+                    return segment.segment_index;
+                } else if (segment.name) {
+                    return segment.name;
+                } else if (segment.segment_type) {
+                    return segment.segment_type;
                 }
-                
-                const icon = icons[segment.name] || '📺';
-                return `${icon} ${segment.display_name}`;
+                return 'Unknown Segment';
             }
             
             getSegmentMediaInfo(segment) {
@@ -576,12 +566,12 @@
 
                 try {
                     await this.newsAudio.play();
-                    this.log('info', `🎵 Playing segment: ${segment.display_name}`);
+                    this.log('info', `🎵 Playing segment: ${this.getSegmentDisplayName(segment)}`);
                 } catch (err) {
                     if (err.name === 'AbortError') {
-                        this.log('warning', `Audio play aborted for segment: ${segment.display_name}`);
+                        this.log('warning', `Audio play aborted for segment: ${this.getSegmentDisplayName(segment)}`);
                     } else {
-                        this.log('error', `Audio play failed for segment: ${segment.display_name} - ${err.message}`);
+                        this.log('error', `Audio play failed for segment: ${this.getSegmentDisplayName(segment)} - ${err.message}`);
                     }
                 }
 
@@ -686,7 +676,7 @@
                 // Log detailed timing every few seconds (to avoid spam)
                 if (Math.floor(audioTime) % 3 === 0 && Math.floor(audioTime * 10) % 10 === 0) {
                     const segmentInfo = currentSegment ? 
-                        `${currentSegment.display_name} (${this.formatTime(currentSegment.start_time)}-${this.formatTime(currentSegment.end_time)})` : 
+                        `${this.getSegmentDisplayName(currentSegment)} (${this.formatTime(currentSegment.start_time)}-${this.formatTime(currentSegment.end_time)})` : 
                         'No active segment';
                     this.log('info', `⏱️ Playback: ${formattedTime} | Segment: ${segmentInfo}`);
                 }
@@ -694,7 +684,7 @@
                 // Handle segment changes with detailed timing
                 if (currentSegment !== this.activeSegment) {
                     const previousSegmentName = this.activeSegment ? this.activeSegment.display_name : 'none';
-                    const newSegmentName = currentSegment ? currentSegment.display_name : 'none';
+                    const newSegmentName = currentSegment ? this.getSegmentDisplayName(currentSegment) : 'none';
                     
                     this.log('info', `🔄 SEGMENT TRANSITION at ${formattedTime}: "${previousSegmentName}" → "${newSegmentName}"`);
                     
@@ -708,7 +698,7 @@
                     if (currentSegment) {
                         const segmentStartTime = this.formatTime(currentSegment.start_time);
                         const timingDiff = audioTime - currentSegment.start_time;
-                        this.log('info', `🎬 Activating: "${currentSegment.display_name}" | Expected start: ${segmentStartTime} | Timing diff: ${timingDiff.toFixed(3)}s`);
+                        this.log('info', `🎬 Activating: "${this.getSegmentDisplayName(currentSegment)}" | Expected start: ${segmentStartTime} | Timing diff: ${timingDiff.toFixed(3)}s`);
                         this.activateSegment(currentSegment);
                     }
                     
@@ -723,7 +713,7 @@
             
             async activateSegment(segment) {
                 const activationTime = this.newsAudio.currentTime;
-                this.log('info', `🎬 ACTIVATING SEGMENT: "${segment.display_name}" at ${this.formatTime(activationTime)}`);
+                this.log('info', `🎬 ACTIVATING SEGMENT: "${this.getSegmentDisplayName(segment)}" at ${this.formatTime(activationTime)}`);
                 this.log('info', `📊 Segment timing: Start=${this.formatTime(segment.start_time)} | End=${this.formatTime(segment.end_time)} | Duration=${segment.duration.toFixed(3)}s`);
                 
                 try {
@@ -754,14 +744,14 @@
                     }
                     
                 } catch (error) {
-                    this.log('error', `❌ Failed to activate segment "${segment.display_name}": ${error.message}`);
+                    this.log('error', `❌ Failed to activate segment "${this.getSegmentDisplayName(segment)}": ${error.message}`);
                 }
             }
             
             async displaySegmentMediaForActiveSegment(segment) {
                 // Handle media display with detailed logging
                 if (segment.media && segment.media.length > 0) {
-                    this.log('info', `🖼️ Processing ${segment.media.length} media items for "${segment.display_name}"`);
+                    this.log('info', `🖼️ Processing ${segment.media.length} media items for "${this.getSegmentDisplayName(segment)}"`);
                     await this.displaySegmentMedia(segment);
                     
                     // Start image rotation if segment has multiple images (and no anchor video is playing)
@@ -769,31 +759,31 @@
                     const anchorVideos = segment.media.filter(m => m.type === 'anchor_video');
                     
                     if (images.length > 1 && (!this.anchorVideosEnabled || anchorVideos.length === 0)) {
-                        this.log('info', `🔄 Starting image rotation: ${images.length} images for "${segment.display_name}"`);
+                        this.log('info', `🔄 Starting image rotation: ${images.length} images for "${this.getSegmentDisplayName(segment)}"`);
                         this.startImageRotation(segment, images);
                     } else if (images.length === 1 && (!this.anchorVideosEnabled || anchorVideos.length === 0)) {
-                        this.log('info', `🖼️ Single image display for "${segment.display_name}": ${images[0].image}`);
+                        this.log('info', `🖼️ Single image display for "${this.getSegmentDisplayName(segment)}": ${images[0].image}`);
                     } else if (anchorVideos.length > 0 && this.anchorVideosEnabled) {
-                        this.log('info', `🎬 Anchor video playing for "${segment.display_name}" - no image rotation needed`);
+                        this.log('info', `🎬 Anchor video playing for "${this.getSegmentDisplayName(segment)}" - no image rotation needed`);
                     }
                 } else {
                     // Hide media if no media for this segment (e.g., summary_opening)
-                    this.log('info', `📺 Hiding media elements - no media for "${segment.display_name}"`);
+                    this.log('info', `📺 Hiding media elements - no media for "${this.getSegmentDisplayName(segment)}"`);
                     this.mainVideo.style.display = 'none';
                     this.mainImage.style.display = 'none';
                     
                     // Log different messages for different segment types
                     if (segment.name === 'summary_opening' || segment.name === 'headline_opening') {
-                        this.log('info', `📢 Introduction segment "${segment.display_name}" - no media required`);
+                        this.log('info', `📢 Introduction segment "${this.getSegmentDisplayName(segment)}" - no media required`);
                     } else {
-                        this.log('warning', `⚠️ No media available for "${segment.display_name}"`);
+                        this.log('warning', `⚠️ No media available for "${this.getSegmentDisplayName(segment)}"`);
                     }
                 }
             }
             
             deactivateSegment(segment) {
                 const deactivationTime = this.newsAudio.currentTime;
-                this.log('info', `🔚 DEACTIVATING SEGMENT: "${segment.display_name}" at ${this.formatTime(deactivationTime)}`);
+                this.log('info', `🔚 DEACTIVATING SEGMENT: "${this.getSegmentDisplayName(segment)}" at ${this.formatTime(deactivationTime)}`);
                 
                 // Calculate and log timing accuracy
                 const expectedEndTime = segment.end_time;
@@ -801,14 +791,14 @@
                 const driftMs = Math.round(timingDrift * 1000);
                 
                 if (Math.abs(timingDrift) > 0.1) {
-                    this.log('warning', `⏰ TIMING DRIFT: "${segment.display_name}" ended ${Math.abs(driftMs)}ms ${timingDrift > 0 ? 'late' : 'early'}`);
+                    this.log('warning', `⏰ TIMING DRIFT: "${this.getSegmentDisplayName(segment)}" ended ${Math.abs(driftMs)}ms ${timingDrift > 0 ? 'late' : 'early'}`);
                 } else {
-                    this.log('info', `⏰ Excellent timing: "${segment.display_name}" drift: ${driftMs}ms`);
+                    this.log('info', `⏰ Excellent timing: "${this.getSegmentDisplayName(segment)}" drift: ${driftMs}ms`);
                 }
                 
                 // Handle outro segments
                 if (segment._isOutro) {
-                    this.log('info', `🎵 Stopping outro audio for "${segment.display_name}"`);
+                    this.log('info', `🎵 Stopping outro audio for "${this.getSegmentDisplayName(segment)}"`);
                     this.segmentAudio.pause();
                     
                     // Restore background music when outro ends
@@ -822,7 +812,7 @@
                 // Hide overlay video when segment ends
                 this.overlayVideo.style.display = 'none';
                 
-                this.log('info', `✅ Segment "${segment.display_name}" deactivated successfully`);
+                this.log('info', `✅ Segment "${this.getSegmentDisplayName(segment)}" deactivated successfully`);
                 // Remove video end handler when segment ends
                 if (this._mainVideoEndHandler) {
                     this.mainVideo.removeEventListener('ended', this._mainVideoEndHandler);
@@ -839,7 +829,7 @@
                 const baseInterval = segment.duration * 1000 / images.length;
                 const rotationInterval = Math.max(3000, Math.min(15000, baseInterval));
                 
-                this.log('info', `🔄 STARTING IMAGE ROTATION for "${segment.display_name}" at ${this.formatTime(rotationStartTime)}`);
+                this.log('info', `🔄 STARTING IMAGE ROTATION for "${this.getSegmentDisplayName(segment)}" at ${this.formatTime(rotationStartTime)}`);
                 this.log('info', `📊 Rotation config: ${images.length} images, ${(rotationInterval/1000).toFixed(1)}s each (segment: ${segment.duration.toFixed(1)}s)`);
                 
                 // Log all images that will be rotated
@@ -878,7 +868,7 @@
                         }, 250);
                     }, rotationInterval);
                 } else {
-                    this.log('info', `📸 Single image mode - no rotation needed for "${segment.display_name}"`);
+                    this.log('info', `📸 Single image mode - no rotation needed for "${this.getSegmentDisplayName(segment)}"`);
                 }
             }
             
@@ -919,43 +909,22 @@
                 const displayTime = this.newsAudio.currentTime;
                 const mediaLeft = document.querySelector('.media-left');
                 const mediaRight = document.querySelector('.media-right');
-                // Clear any previous image rotation
                 this.clearImageRotation();
-                // Remove previous video end event listener if any
                 if (this._mainVideoEndHandler) {
                     this.mainVideo.removeEventListener('ended', this._mainVideoEndHandler);
                     this._mainVideoEndHandler = null;
                 }
-                if (!segment.media || segment.media.length === 0) {
-                    // No media for this segment - hide both video and image
-                    this.mainVideo.style.display = 'none';
-                    this.mainImage.style.display = 'none';
-                    this.overlayVideo.style.display = 'none';
-                    mediaLeft.classList.add('full-width');
-                    mediaRight.classList.add('hidden');
-                    this.clearImageKenBurns();
-                    this.log('info', `📺 No media to display for segment: "${segment.display_name}" at ${this.formatTime(displayTime)}`);
-                    return;
-                }
-                this.log('info', `🖼️ DISPLAYING MEDIA for "${segment.display_name}" at ${this.formatTime(displayTime)}`);
-                this.log('info', `📊 Media inventory: ${segment.media.length} total items`);
-                // Separate anchor videos from other media
-                const anchorVideos = segment.media.filter(m => m.type === 'anchor_video');
-                const otherVideos = segment.media.filter(m => m.video && m.type !== 'anchor_video');
-                const images = segment.media.filter(m => m.image);
-                // Always show anchor video on the right, main media on the left
-                // 1. Anchor video (right)
-                if (anchorVideos.length > 0) {
-                    let anchor = anchorVideos[0];
-                    let anchorPath = anchor.path;
+                // Anchor video logic
+                if (this.anchorVideosEnabled && segment.anchor_video && segment.anchor_video !== '') {
+                    let anchorPath = segment.anchor_video;
                     if (!anchorPath.startsWith('/')) {
-                        anchorPath = anchorPath.startsWith('generated/anchor/') ? '/' + anchorPath : '/generated/anchor/' + anchorPath;
+                        anchorPath = '/' + anchorPath;
                     }
                     this.overlayVideo.style.display = 'block';
                     this.overlayVideo.classList.add('anchor');
                     this.overlayVideo.src = anchorPath;
                     await this.overlayVideo.play();
-                    this.log('info', `🎬 Anchor video (right) playing: "${anchor.video}"`);
+                    this.log('info', `🎬 Anchor video (right) playing from anchor_video field: "${anchorPath}" for segment: ${segment.segment_index}`);
                     mediaLeft.classList.remove('full-width');
                     mediaRight.classList.remove('hidden');
                 } else {
@@ -963,7 +932,9 @@
                     mediaLeft.classList.add('full-width');
                     mediaRight.classList.add('hidden');
                 }
-                // 2. Main media (left): prefer non-anchor video, then image(s)
+                // Main media (left): prefer non-anchor video, then image(s)
+                const otherVideos = segment.media.filter(m => m.video);
+                const images = segment.media.filter(m => m.image);
                 if (otherVideos.length > 0) {
                     let mainVid = otherVideos[0];
                     let mainVidPath = mainVid.path;
@@ -972,8 +943,7 @@
                     }
                     this.mainVideo.style.display = 'block';
                     this.mainVideo.src = mainVidPath;
-                    this.mainVideo.loop = true; // Always loop media videos
-                    // Add event listener to restart video if it ends before audio
+                    this.mainVideo.loop = true;
                     this._mainVideoEndHandler = () => {
                         if (!this.newsAudio.paused && this.newsAudio.currentTime < segment.duration) {
                             this.mainVideo.currentTime = 0;
@@ -985,7 +955,6 @@
                     this.mainImage.style.display = 'none';
                     this.log('info', `📹 Main video (left) playing: "${mainVid.video}"`);
                 } else if (images.length > 1) {
-                    // Slideshow/rotation for multiple images
                     this.currentImageIndex = 0;
                     const showImage = (idx) => {
                         const img = images[idx];
@@ -993,10 +962,8 @@
                         if (!imgPath.startsWith('/')) {
                             imgPath = imgPath.startsWith('media/') ? '/' + imgPath : '/media/' + imgPath;
                         }
-                        // Set background image (blurred)
                         const backgroundElement = document.querySelector('.media-left-background');
                         backgroundElement.style.backgroundImage = `url('${imgPath}')`;
-                        // Set foreground image
                         this.mainImage.style.display = 'block';
                         this.mainImage.src = imgPath;
                         this.applyKenBurnsEffect();
@@ -1020,7 +987,6 @@
                     this.applyKenBurnsEffect();
                     this.mainVideo.style.display = 'none';
                     this.log('info', `🖼️ Main image (left) showing: "${img.image}"`);
-                    // No timer needed, just keep image displayed for segment duration
                 } else {
                     this.mainVideo.style.display = 'none';
                     this.mainImage.style.display = 'none';
@@ -1052,7 +1018,7 @@
                 if (segment && segment.headline) {
                     // Show lower-third for segments with headline data (headlines and news stories)
                     if (lowerThird.style.display !== 'block') {
-                        this.log('info', `📰 SHOWING LOWER-THIRD at ${this.formatTime(currentTime)} for "${segment.display_name}"`);
+                        this.log('info', `📰 SHOWING LOWER-THIRD at ${this.formatTime(currentTime)} for "${this.getSegmentDisplayName(segment)}"`);
                         this.log('info', `📰 Headline: "${segment.headline.text}"`);
                         this.log('info', `📰 Category: "${segment.headline.category}" | Location: "${segment.headline.location}"`);
                     }
@@ -1065,7 +1031,7 @@
                 } else {
                     // Hide lower-third for segments without headline data
                     if (lowerThird.style.display !== 'none') {
-                        this.log('info', `📰 HIDING LOWER-THIRD at ${this.formatTime(currentTime)} - segment without headline data "${segment ? segment.display_name : 'none'}"`);
+                        this.log('info', `📰 HIDING LOWER-THIRD at ${this.formatTime(currentTime)} - segment without headline data "${this.getSegmentDisplayName(segment) || 'none'}"`);
                     }
                     lowerThird.style.display = 'none';
                 }
@@ -1116,7 +1082,7 @@
                 );
                 
                 if (targetSegment) {
-                    this.log('info', `🎯 Seeking to segment: "${targetSegment.display_name}" (${this.formatTime(targetSegment.start_time)}-${this.formatTime(targetSegment.end_time)})`);
+                    this.log('info', `🎯 Seeking to segment: "${this.getSegmentDisplayName(targetSegment)}" (${this.formatTime(targetSegment.start_time)}-${this.formatTime(targetSegment.end_time)})`);
                 } else {
                     this.log('warning', `⚠️ Seeking to time outside any segment: ${this.formatTime(newTime)}`);
                 }
@@ -1225,7 +1191,7 @@
                 
                 // Refresh current segment media if playing
                 if (this.activeSegment && this.isPlaying) {
-                    this.log('info', `🔄 Refreshing media display for "${this.activeSegment.display_name}"`);
+                    this.log('info', `🔄 Refreshing media display for "${this.getSegmentDisplayName(this.activeSegment)}"`);
                     this.displaySegmentMediaForActiveSegment(this.activeSegment);
                 }
             }
@@ -1245,7 +1211,7 @@
                 
                 // Refresh current segment media if playing
                 if (this.activeSegment && this.isPlaying) {
-                    this.log('info', `🔄 Refreshing media display for "${this.activeSegment.display_name}"`);
+                    this.log('info', `🔄 Refreshing media display for "${this.getSegmentDisplayName(this.activeSegment)}"`);
                     this.displaySegmentMediaForActiveSegment(this.activeSegment);
                 }
             }
@@ -1316,7 +1282,7 @@
                     const timeIntoSegment = currentTime - expectedStart;
                     const timeRemaining = expectedEnd - currentTime;
                     
-                    this.log('info', `🎬 Active Segment: "${segment.display_name}"`);
+                    this.log('info', `🎬 Active Segment: "${this.getSegmentDisplayName(segment)}"`);
                     this.log('info', `📊 Expected: ${this.formatTime(expectedStart)}-${this.formatTime(expectedEnd)} (${segment.duration.toFixed(3)}s)`);
                     this.log('info', `⏱️ Progress: ${this.formatTime(timeIntoSegment)} into segment`);
                     this.log('info', `⏳ Remaining: ${this.formatTime(timeRemaining)} left in segment`);
@@ -1346,7 +1312,7 @@
                 );
                 if (nextSegment) {
                     const timeToNext = nextSegment.start_time - currentTime;
-                    this.log('info', `⏭️ Next Segment: "${nextSegment.display_name}" in ${this.formatTime(timeToNext)}`);
+                    this.log('info', `⏭️ Next Segment: "${this.getSegmentDisplayName(nextSegment)}" in ${this.formatTime(timeToNext)}`);
                 }
                 
                 this.log('info', '🔍 =================================');
