@@ -8,7 +8,7 @@ python wav2lip_test/Wav2Lip/inference_chunked.py --checkpoint_path checkpoints/w
 python wav2lip_test/Wav2Lip/inference_chunked.py --checkpoint_path checkpoints/wav2lip.pth --face test_video_newscaster.mp4 --audio generated/audio/opening_greeting_0.mp3 --outfile generated/anchor/opening_greeting_0.mp4 --wav2lip_batch_size 4 --resize_factor 2 --chunk_size 25
 
 #headline_opening_1
-python wav2lip_test/Wav2Lip/inference_chunked.py --checkpoint_path checkpoints/wav2lip.pth --face test_video_newscaster.mp4 --audio generated/audio/headline_opening_1.mp3 --outfile generated/anchor/headline_opening_1.mp4 --wav2lip_batch_size 4 --resize_factor 2 --chunk_size 25
+python wav2lip_test/Wav2Lip/inference_chunked.py --checkpoint_path checkpoints/wav2lip.pth --face test_video_newscaster.mp4 --audio generated/audio/headline_opening_1.mp3 --wav2lip_batch_size 4 --resize_factor 2 --chunk_size 25
 
 #headline_2.mp3
 python wav2lip_test/Wav2Lip/inference_chunked.py --checkpoint_path checkpoints/wav2lip.pth --face test_video_newscaster.mp4 --audio generated/audio/headline_2.mp3 --outfile generated/anchor/headline_2.mp4 --wav2lip_batch_size 4 --resize_factor 2 --chunk_size 25

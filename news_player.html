@@ -625,6 +625,7 @@
                 this.mainVideo.style.display = 'none';
                 this.mainImage.style.display = 'none';
                 this.overlayVideo.style.display = 'none';
+                this.log('info', '[DEBUG] All media elements hidden and reset in stop()');
                 this.playBtn.disabled = false;
                 this.pauseBtn.disabled = true;
                 this.stopBtn.disabled = true;
@@ -653,62 +654,20 @@
             
             updatePlayback() {
                 if (!this.isPlaying) return;
-                
                 this.currentTime = this.newsAudio.currentTime;
-                
-                // Enhanced timing logs
+                // Only update UI for the current segment
+                const segment = this.activeSegment;
+                // Log timing for debug
                 const audioTime = this.newsAudio.currentTime;
                 const formattedTime = this.formatTime(audioTime);
-                
-                // Check for pending media display - display media when audio actually reaches segment start
-                if (this.pendingMediaSegment && audioTime >= this.pendingMediaSegment.start_time) {
-                    this.log('info', `⏰ Audio caught up! Displaying media for "${this.pendingMediaSegment.display_name}" at ${formattedTime}`);
-                    this.displaySegmentMediaForActiveSegment(this.pendingMediaSegment);
-                    this.pendingMediaSegment = null; // Clear pending
-                }
-                
-                // Find current segment based on audio time
-                const currentSegment = this.segments.find(segment => 
-                    this.currentTime >= segment.start_time && 
-                    this.currentTime <= segment.end_time
-                );
-                
-                // Log detailed timing every few seconds (to avoid spam)
                 if (Math.floor(audioTime) % 3 === 0 && Math.floor(audioTime * 10) % 10 === 0) {
-                    const segmentInfo = currentSegment ? 
-                        `${this.getSegmentDisplayName(currentSegment)} (${this.formatTime(currentSegment.start_time)}-${this.formatTime(currentSegment.end_time)})` : 
-                        'No active segment';
+                    const segmentInfo = segment ? `${this.getSegmentDisplayName(segment)} (${this.formatTime(segment.start_time)}-${this.formatTime(segment.end_time)})` : 'No active segment';
                     this.log('info', `⏱️ Playback: ${formattedTime} | Segment: ${segmentInfo}`);
                 }
-                
-                // Handle segment changes with detailed timing
-                if (currentSegment !== this.activeSegment) {
-                    const previousSegmentName = this.activeSegment ? this.activeSegment.display_name : 'none';
-                    const newSegmentName = currentSegment ? this.getSegmentDisplayName(currentSegment) : 'none';
-                    
-                    this.log('info', `🔄 SEGMENT TRANSITION at ${formattedTime}: "${previousSegmentName}" → "${newSegmentName}"`);
-                    
-                    if (this.activeSegment) {
-                        const segmentEndTime = this.formatTime(this.activeSegment.end_time);
-                        const timingDiff = audioTime - this.activeSegment.end_time;
-                        this.log('info', `🔚 Deactivating: "${this.activeSegment.display_name}" | Expected end: ${segmentEndTime} | Timing diff: ${timingDiff.toFixed(3)}s`);
-                        this.deactivateSegment(this.activeSegment);
-                    }
-                    
-                    if (currentSegment) {
-                        const segmentStartTime = this.formatTime(currentSegment.start_time);
-                        const timingDiff = audioTime - currentSegment.start_time;
-                        this.log('info', `🎬 Activating: "${this.getSegmentDisplayName(currentSegment)}" | Expected start: ${segmentStartTime} | Timing diff: ${timingDiff.toFixed(3)}s`);
-                        this.activateSegment(currentSegment);
-                    }
-                    
-                    this.activeSegment = currentSegment;
-                }
-                
-                // Update UI
+                // Update UI for the current segment
                 this.updateTimeline();
                 this.updateActivePlaylistItems();
-                this.updateLowerThird(currentSegment);
+                this.updateLowerThird(segment);
             }
             
             async activateSegment(segment) {
@@ -883,6 +842,7 @@
                 const backgroundElement = document.querySelector('.media-left-background');
                 if (backgroundElement) {
                     backgroundElement.style.backgroundImage = 'none';
+                    this.log('info', '[DEBUG] Blurred background cleared in clearImageRotation()');
                 }
             }
             
@@ -906,6 +866,7 @@
             }
             
             async displaySegmentMedia(segment) {
+                this.log('info', `[DEBUG] displaySegmentMedia called for segment: ${segment ? this.getSegmentDisplayName(segment) : 'null'}`);
                 const displayTime = this.newsAudio.currentTime;
                 const mediaLeft = document.querySelector('.media-left');
                 const mediaRight = document.querySelector('.media-right');
@@ -914,8 +875,9 @@
                     this.mainVideo.removeEventListener('ended', this._mainVideoEndHandler);
                     this._mainVideoEndHandler = null;
                 }
-                // Anchor video logic
-                if (this.anchorVideosEnabled && segment.anchor_video && segment.anchor_video !== '') {
+                // --- Right panel: Anchor video only ---
+                const hasAnchor = this.anchorVideosEnabled && segment.anchor_video && segment.anchor_video !== '';
+                if (hasAnchor) {
                     let anchorPath = segment.anchor_video;
                     if (!anchorPath.startsWith('/')) {
                         anchorPath = '/' + anchorPath;
@@ -925,16 +887,20 @@
                     this.overlayVideo.src = anchorPath;
                     await this.overlayVideo.play();
                     this.log('info', `🎬 Anchor video (right) playing from anchor_video field: "${anchorPath}" for segment: ${segment.segment_index}`);
-                    mediaLeft.classList.remove('full-width');
                     mediaRight.classList.remove('hidden');
+                    // Keep media-left at 50% width
+                    mediaLeft.classList.remove('full-width');
+                    this.log('info', 'media-left set to 50% (anchor video present)');
                 } else {
                     this.overlayVideo.style.display = 'none';
-                    mediaLeft.classList.add('full-width');
                     mediaRight.classList.add('hidden');
+                    // Set media-left to 100% width
+                    mediaLeft.classList.add('full-width');
+                    this.log('info', 'media-left set to 100% (no anchor video)');
                 }
-                // Main media (left): prefer non-anchor video, then image(s)
-                const otherVideos = segment.media.filter(m => m.video);
-                const images = segment.media.filter(m => m.image);
+                // --- Left panel: Only media array (videos/images) ---
+                const otherVideos = segment.media.filter(m => m.video && m.type !== 'anchor_video');
+                const images = segment.media.filter(m => m.image && m.type !== 'anchor_video');
                 if (otherVideos.length > 0) {
                     let mainVid = otherVideos[0];
                     let mainVidPath = mainVid.path;
@@ -975,12 +941,19 @@
                     this.imageRotationInterval = setInterval(() => {
                         this.currentImageIndex = (this.currentImageIndex + 1) % images.length;
                         showImage(this.currentImageIndex);
+                        this.log('info', `[DEBUG] Image rotation: showing image index ${this.currentImageIndex}`);
                     }, interval);
                 } else if (images.length === 1) {
                     let img = images[0];
                     let imgPath = img.path;
                     if (!imgPath.startsWith('/')) {
                         imgPath = imgPath.startsWith('media/') ? '/' + imgPath : '/media/' + imgPath;
+                    }
+                    // Set blurred background for single image
+                    const backgroundElement = document.querySelector('.media-left-background');
+                    if (backgroundElement) {
+                        backgroundElement.style.backgroundImage = `url('${imgPath}')`;
+                        this.log('info', `🖼️ Blurred background set for single image: "${img.image}"`);
                     }
                     this.mainImage.style.display = 'block';
                     this.mainImage.src = imgPath;
@@ -990,6 +963,7 @@
                 } else {
                     this.mainVideo.style.display = 'none';
                     this.mainImage.style.display = 'none';
+                    this.log('info', '[DEBUG] No video or image to display in displaySegmentMedia()');
                 }
             }
             
@@ -1132,9 +1106,10 @@
             handleSegmentEnd() {
                 if (this.currentSegmentIndex < this.segments.length - 1) {
                     this.currentSegmentIndex++;
+                    this.log('info', `[DEBUG] handleSegmentEnd: Advancing to segment index ${this.currentSegmentIndex}`);
                     this.playSegment(this.currentSegmentIndex);
                 } else {
-                    this.log('info', 'Reached end of playlist.');
+                    this.log('info', '[DEBUG] handleSegmentEnd: Reached end of playlist, calling stop()');
                     this.stop();
                 }
             }

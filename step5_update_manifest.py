@@ -3,7 +3,8 @@
 Step 4: Update News Manifest with Media
 This script updates news_manifest.json to add relevant media based on news_data.json
 
-python step4_update_manifest.py --add-weather
+python step5_update_manifest.py
+python step5_update_manifest.py --add-weather
 """
 
 import os

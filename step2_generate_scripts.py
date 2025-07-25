@@ -410,7 +410,6 @@ Requirements:
 - Engaging and informative for viewers
 - Natural flow and good pacing
 - DO NOT start with greetings like "Magandang araw" (opening already handled that)
-- Start directly with the news content or use transitions like "Sa iba pang balita..."
 - Maintain continuity with previous segments
 - IMPORTANT: Generate ONLY the text that the anchor would speak out loud
 - Do NOT include video directions, camera cuts, or production notes

@@ -105,6 +105,7 @@ FILIPINO_TEXT_PROCESSING = {
         "Pulilan, Bulacan": "Pulilan",
         # # Basic Filipino pronunciation improvements
         "Brgy.": "Barangay",
+        "Barangay.": "Barangay",
         "Brgy": "Barangay",
         
         # # Title and name abbreviations (should come before street abbreviations)
