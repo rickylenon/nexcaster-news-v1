@@ -253,6 +253,51 @@ def print_media_summary(segments):
             elif 'image' in media:
                 print(f"  🖼️  {media['image'][:40]}... ({media['type']})")
 
+def make_transition_segment(index):
+    """Create a transition segment with a unique index."""
+    return {
+        "segment_type": "transition",
+        "segment_index": f"transition_{index}",
+        "audio_path": "media/transition.mp3",
+        "script": "",
+        "duration": 2,
+        "media": [
+            {
+                "video": "transition.mp4",
+                "path": "media/transition.mp4",
+                "type": "transition_video"
+            }
+        ],
+        "anchor_video": ""
+    }
+
+def insert_transition_segments(segments):
+    """
+    Remove all existing transition segments, then insert new transitions before headline_opening and news_1.
+    Returns a new list of segments with transitions inserted.
+    """
+    # Remove all existing transitions
+    filtered_segments = [seg for seg in segments if seg.get("segment_type") != "transition"]
+    new_segments = []
+    transition_counter = 1
+    inserted_headline_opening = False
+    inserted_news_1 = False
+    for seg in filtered_segments:
+        # Insert before headline_opening
+        if not inserted_headline_opening and seg["segment_type"] == "headline_opening":
+            new_segments.append(make_transition_segment(transition_counter))
+            print(f"[TRANSITION] Inserted transition_{transition_counter} before headline_opening")
+            transition_counter += 1
+            inserted_headline_opening = True
+        # Insert before news_1
+        if not inserted_news_1 and seg["segment_type"] == "news" and seg.get("segment_index") == "news_1":
+            new_segments.append(make_transition_segment(transition_counter))
+            print(f"[TRANSITION] Inserted transition_{transition_counter} before news_1")
+            transition_counter += 1
+            inserted_news_1 = True
+        new_segments.append(seg)
+    return new_segments
+
 def main():
     """Main function to update manifest with media and optionally add weather segments"""
     print("=== Nexcaster News Manifest Media Updater ===")
@@ -269,6 +314,8 @@ def main():
     if not segments:
         return
     updated_segments = map_media_to_segments(segments, news_data)
+    # Insert transition segments before headline_opening and news_1
+    updated_segments = insert_transition_segments(updated_segments)
     if add_weather:
         weather_segments = load_weather_segments()
         updated_segments = insert_weather_segments(updated_segments, weather_segments)
