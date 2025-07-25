@@ -11,7 +11,7 @@ from datetime import datetime
 import pytz
 import re
 from dotenv import load_dotenv
-from config import SEGMENT_TYPES, DEFAULT_SEGMENT_ORDER, STATION_INFO, LLM_CONFIG, LANGUAGE, FILIPINO_TEXT_PROCESSING, USE_REPLACEMENTS
+from config import SEGMENT_TYPES, STATION_INFO, LLM_CONFIG, LANGUAGE, FILIPINO_TEXT_PROCESSING, USE_REPLACEMENTS
 
 # Load environment variables from .env file
 load_dotenv()
@@ -219,16 +219,12 @@ def generate_opening_script(time_info):
         
         script = f"{greeting}, {time_info['location']}! It's {time_info['time']} on this {time_info['day']}, {time_info['date']}, here in {time_info['region']}. I'm {time_info['anchor']} with {time_info['station']}, bringing you the latest news and updates from our community."
     
-    # Process the script for Filipino TTS if language is Filipino and USE_REPLACEMENTS is True
     if LANGUAGE.lower() == "filipino" and USE_REPLACEMENTS:
         script = process_filipino_script(script)
         print("Applied Filipino text processing to opening script")
     
     return {
         "segment_type": "opening_greeting",
-        "display_name": SEGMENT_TYPES["opening"]["display_name"],
-        "display_order": 0,
-        "duration": SEGMENT_TYPES["opening"]["default_duration"],
         "script": script
     }
 
@@ -239,28 +235,22 @@ def generate_summary_scripts(news_data, time_info):
     
     summary_scripts = []
     
-    # 1. Generate headline opening segment
     print("Generating headline opening...")
     if LANGUAGE.lower() == "filipino":
         opening_script = "Narito ang mga pangunahing balita sa aming bayan."
     else:
         opening_script = "Here are today's top stories from our community."
     
-    # Process the opening script for Filipino TTS if language is Filipino and USE_REPLACEMENTS is True
     if LANGUAGE.lower() == "filipino" and USE_REPLACEMENTS:
         opening_script = process_filipino_script(opening_script)
         print("Applied Filipino text processing to headline opening")
     
     summary_opening = {
         "segment_type": "headline_opening",
-        "display_name": "News Headline Opening",
-        "display_order": 1,
-        "duration": 5.0,  # Short opening
         "script": opening_script
     }
     summary_scripts.append(summary_opening)
     
-    # 2. Generate individual headline segments
     for i, news_item in enumerate(news_data):
         print(f"Generating headline for news item {i+1}...")
         
@@ -318,16 +308,12 @@ Script (anchor headline TITLE only in {LANGUAGE}, professional news title format
             # Fallback to simple template
             script = news_item['news'][:150] + ("..." if len(news_item['news']) > 150 else "")
         
-        # Process the script for Filipino TTS if language is Filipino and USE_REPLACEMENTS is True
         if LANGUAGE.lower() == "filipino" and USE_REPLACEMENTS:
             script = process_filipino_script(script)
             print(f"Applied Filipino text processing to headline script {i+1}")
         
         summary_script = {
             "segment_type": "headline",
-            "display_name": f"News Headline {i+1}",
-            "display_order": i + 2,  # After opening (0) and headline_opening (1)
-            "duration": SEGMENT_TYPES["headline"]["default_duration"],
             "script": script
         }
         
@@ -406,7 +392,6 @@ Headline (in {LANGUAGE}, professional news headline format, no abbreviations, sp
             # Fallback to simple template
             headline = news_item['news'][:100] + ("..." if len(news_item['news']) > 100 else "")
         
-        # Process the headline for Filipino TTS if language is Filipino and USE_REPLACEMENTS is True
         if LANGUAGE.lower() == "filipino" and USE_REPLACEMENTS:
             headline = process_filipino_script(headline)
             print(f"Applied Filipino text processing to headline {i+1}")
@@ -461,21 +446,16 @@ Script (anchor speech only in {LANGUAGE}, no greeting, smooth transition, no abb
             print(f"Error generating script for news item {i+1}: {e}")
             # Fallback to simple template
             if LANGUAGE.lower() == "filipino":
-                script = f"Sa iba pang balita, {news_item['news']}"
+                script = f"{news_item['news']}"
             else:
                 script = f"In other news, {news_item['news']}"
         
-        # Process the script for Filipino TTS if language is Filipino and USE_REPLACEMENTS is True
         if LANGUAGE.lower() == "filipino" and USE_REPLACEMENTS:
             script = process_filipino_script(script)
             print(f"Applied Filipino text processing to news script {i+1}")
         
         news_script = {
             "segment_type": "news",
-            "display_name": f"News Story {i+1}",
-            "display_order": i + 100,  # After opening, headline_opening, and headlines, using 100+ to ensure they come after all headlines
-            "duration": SEGMENT_TYPES["news"]["default_duration"],
-            "headline": headline,
             "script": script
         }
         
@@ -490,16 +470,12 @@ def generate_closing_script(time_info):
     else:
         script = f"That's all for now from {time_info['station']}. Thank you for staying informed with us here in {time_info['location']}, {time_info['region']}. I'm {time_info['anchor']}, and we'll see you next time. Have a great day!"
     
-    # Process the script for Filipino TTS if language is Filipino and USE_REPLACEMENTS is True
     if LANGUAGE.lower() == "filipino" and USE_REPLACEMENTS:
         script = process_filipino_script(script)
         print("Applied Filipino text processing to closing script")
     
     return {
         "segment_type": "closing_remarks",
-        "display_name": SEGMENT_TYPES["closing"]["display_name"],
-        "display_order": 999,  # Last segment
-        "duration": SEGMENT_TYPES["closing"]["default_duration"],
         "script": script
     }
 
@@ -519,55 +495,52 @@ def main():
     print("Step 2: Generating news scripts from uploaded content")
     print()
     
-    # Load news data
     news_data = load_news_data()
     if not news_data:
         return
     
-    # Get current time information
     time_info = get_current_time_info()
     
-    # Generate all script segments
     scripts = []
     
-    # 1. Opening greeting
     print("Generating opening greeting...")
     opening = generate_opening_script(time_info)
     scripts.append(opening)
     
-    # 2. News summaries (if there are news items)
     if news_data:
         print("Generating news summaries...")
         summaries = generate_summary_scripts(news_data, time_info)
         scripts.extend(summaries)
     
-    # 3. Individual news stories
     if news_data:
         print("Generating individual news stories...")
         news_scripts = generate_news_scripts(news_data, time_info)
         scripts.extend(news_scripts)
     
-    # 4. Closing remarks
     print("Generating closing remarks...")
     closing = generate_closing_script(time_info)
     scripts.append(closing)
-    
-    # Sort by display_order
-    scripts.sort(key=lambda x: x['display_order'])
-    
-    # Save to file
+
+    # Assign segment_index based on segment_type order
+    segment_type_counts = {}
+    for script in scripts:
+        seg_type = script["segment_type"]
+        segment_type_counts.setdefault(seg_type, 0)
+        segment_type_counts[seg_type] += 1
+        script["segment_index"] = f"{seg_type}_{segment_type_counts[seg_type]}"
+        # Remove display_name if present
+        if "display_name" in script:
+            del script["display_name"]
+
     save_news_scripts(scripts)
     
     print()
     print("=== Script Generation Complete ===")
     print(f"Total segments: {len(scripts)}")
-    total_duration = sum(script['duration'] for script in scripts)
-    print(f"Estimated total duration: {total_duration:.1f} seconds ({total_duration/60:.1f} minutes)")
     
-    # Display headline
     print("\nGenerated segments:")
     for script in scripts:
-        print(f"  - {script['display_name']}: {script['duration']}s")
+        print(f"  - {script['segment_index']}")
 
 if __name__ == "__main__":
     main() 

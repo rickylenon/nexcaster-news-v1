@@ -39,27 +39,9 @@ REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 # Database Configuration
 DATABASE_URI = os.getenv('DATABASE_URI', f"sqlite:///{os.path.join(BASE_DIR, 'weather_reports.db')}")
 
-# Logging Configuration
-LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
-LOG_ROTATION = os.getenv('LOG_ROTATION', '500 MB')
-LOG_RETENTION = os.getenv('LOG_RETENTION', '10 days')
-LOG_FORMAT = "{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
 
-# Video Output Configuration
-VIDEO_OUTPUT_WIDTH = int(os.getenv('VIDEO_OUTPUT_WIDTH', '1920'))
-VIDEO_OUTPUT_HEIGHT = int(os.getenv('VIDEO_OUTPUT_HEIGHT', '1080'))
-VIDEO_OUTPUT_FPS = int(os.getenv('VIDEO_OUTPUT_FPS', '30'))
-VIDEO_OUTPUT_QUALITY = int(os.getenv('VIDEO_OUTPUT_QUALITY', '95'))
 
-# General Application Settings
-APP_NAME = "Weather Report Video Generator"
-MAX_VIDEOS_STORED = int(os.getenv('MAX_VIDEOS_STORED', '50'))
-CLEANUP_OLD_VIDEOS = os.getenv('CLEANUP_OLD_VIDEOS', 'True').lower() == 'true'
-VIDEO_RETENTION_DAYS = int(os.getenv('VIDEO_RETENTION_DAYS', '30'))
 
-# Script Generation Settings
-BRIEF_MODE = os.getenv('BRIEF_MODE', 'True').lower() == 'true'
-INCLUDE_VIDEO_SEGMENTS = os.getenv('INCLUDE_VIDEO_SEGMENTS', 'False').lower() == 'true'
 
 # Scraping Configuration
 SCRAPING = {
@@ -329,31 +311,31 @@ AI_CONFIG = {
 
 # Text-to-Speech Configuration (Enhanced with news-style options)
 TTS_CONFIG = {
-    "provider": os.getenv("TTS_PROVIDER", "google"),  # Options: "openai", "elevenlabs", "google"
+    "provider": os.getenv("TTS_PROVIDER", "elevenlabs"),  # Default to 'elevenlabs' for weather, options: "openai", "elevenlabs", "google"
     "openai": {
-        "voice": os.getenv("TTS_OPENAI_VOICE", "alloy"),  # alloy works well with Filipino
-        "speed": float(os.getenv("TTS_OPENAI_SPEED", "0.9")),  # Slightly slower for Filipino clarity
-        "model": os.getenv("TTS_OPENAI_MODEL", "tts-1-hd"),  # Higher quality model
+        "voice": os.getenv("TTS_OPENAI_VOICE", "alloy"),
+        "speed": float(os.getenv("TTS_OPENAI_SPEED", "0.9")),
+        "model": os.getenv("TTS_OPENAI_MODEL", "tts-1-hd"),
         "output_format": "mp3",
     },
     "elevenlabs": {
         "voice_id": os.getenv("TTS_ELEVENLABS_VOICE_ID", "EXAVITQu4vr4xnSDxMaL"),  # Bella (female voice)
-        "model_id": os.getenv("TTS_ELEVENLABS_MODEL_ID", "eleven_flash_v2_5"),  # Supports Filipino and English
+        "model_id": os.getenv("TTS_ELEVENLABS_MODEL_ID", "eleven_flash_v2_5"),
         "voice_settings": {
-            "stability": float(os.getenv("TTS_ELEVENLABS_STABILITY", "0.75")),  # How stable the voice is
-            "similarity_boost": float(os.getenv("TTS_ELEVENLABS_SIMILARITY_BOOST", "0.8")),  # Voice similarity
-            "style": float(os.getenv("TTS_ELEVENLABS_STYLE", "0.5")),  # Style exaggeration
+            "stability": float(os.getenv("TTS_ELEVENLABS_STABILITY", "0.75")),
+            "similarity_boost": float(os.getenv("TTS_ELEVENLABS_SIMILARITY_BOOST", "0.8")),
+            "style": float(os.getenv("TTS_ELEVENLABS_STYLE", "0.5")),
             "use_speaker_boost": os.getenv("TTS_ELEVENLABS_SPEAKER_BOOST", "True").lower() == 'true'
         },
-        "output_format": os.getenv("TTS_ELEVENLABS_FORMAT", "mp3_44100_128"),  # High quality mp3
-        "chunk_length_schedule": [120, 160, 250, 370],  # Text chunk sizes for longer texts
+        "output_format": os.getenv("TTS_ELEVENLABS_FORMAT", "mp3_44100_128"),
+        "chunk_length_schedule": [120, 160, 250, 370],
     },
     "google": {
-        "language_code": os.getenv("TTS_GOOGLE_LANG", "fil-PH"),  # fil-PH for Filipino, en-US
-        "voice_name": os.getenv("TTS_GOOGLE_VOICE", "fil-PH-Standard-A"),  # fil-PH-Standard-A for Filipino, en-US-Chirp3-HD-Achernar EN
+        "language_code": os.getenv("TTS_GOOGLE_LANG", "fil-PH"),
+        "voice_name": os.getenv("TTS_GOOGLE_VOICE", "fil-PH-Standard-A"),
         "voice_gender": os.getenv("TTS_GOOGLE_GENDER", "FEMALE"),
-        "speaking_rate": float(os.getenv("TTS_GOOGLE_RATE", "0.9")),  # Slightly slower for clarity
-        "pitch": float(os.getenv("TTS_GOOGLE_PITCH", "0.0")),  # Normal pitch
+        "speaking_rate": float(os.getenv("TTS_GOOGLE_RATE", "0.9")),
+        "pitch": float(os.getenv("TTS_GOOGLE_PITCH", "0.0")),
         "output_format": "mp3",
         "audio_encoding": "MP3",
     },

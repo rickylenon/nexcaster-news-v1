@@ -36,13 +36,6 @@ SEGMENT_TYPES = {
     }
 }
 
-# Default news report structure
-DEFAULT_SEGMENT_ORDER = [
-    "opening",
-    "summary", 
-    "news",
-    "closing"
-]
 
 # Location and station information
 STATION_INFO = {
@@ -71,8 +64,7 @@ Guidelines:
 6. Include time references and location mentions when relevant
 7. Make the content engaging for local viewers
 8. Maintain broadcast continuity - avoid starting each segment with greetings
-9. Use natural transitions like "Sa iba pang balita..." or "Samantala..."
-10. Focus on delivering news content, not introductory pleasantries"""
+9. Focus on delivering news content, not introductory pleasantries"""
 }
 
 # Audio/TTS Configuration
@@ -104,15 +96,7 @@ TTS_CONFIG_ELEVENLABS = {
     "output_format": "mp3_44100_128",  # mp3_22050_32, mp3_44100_64, mp3_44100_128, mp3_44100_192
     "chunk_length_schedule": [120, 160, 250, 370],  # Text chunk sizes for longer texts
 }
-# TTS_CONFIG_GOOGLE = {
-#     "language_code": "fil-PH",  # Filipino (Philippines)
-#     "voice_name": "fil-PH-Standard-A",  # Filipino female voice
-#     "voice_gender": "FEMALE",
-#     "speaking_rate": 0.9,  # Slightly slower for clarity
-#     "pitch": 0.0,  # Normal pitch
-#     "output_format": "mp3",
-#     "audio_encoding": "MP3"
-# }
+
 USE_REPLACEMENTS = True
 # Filipino Text Processing Configuration
 FILIPINO_TEXT_PROCESSING = {
@@ -265,18 +249,6 @@ FILIPINO_TEXT_PROCESSING = {
     }
 }
 
-# Subtitle/Timing Configuration
-SUBTITLE_CONFIG = {
-    "words_per_minute": 150,  # Average speaking rate
-    "pause_duration": 0.5,    # Pause between sentences
-    "segment_gap": 1.0,       # Gap between segments
-    "max_subtitle_duration": 3.0,    # Maximum duration for a single subtitle
-    "min_subtitle_duration": 1.0,    # Minimum duration for a single subtitle
-    "max_words_per_subtitle": 8,     # Maximum words per subtitle
-    "min_words_per_subtitle": 3,     # Minimum words per subtitle
-    "phrase_break_threshold": 0.5,   # Pause threshold to break phrases (seconds)
-    "grouping_mode": "smart"          # "word", "phrase", "sentence", or "smart"
-}
 
 print("Configuration loaded successfully")
 print(f"Available segment types: {list(SEGMENT_TYPES.keys())}")

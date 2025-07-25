@@ -4,7 +4,7 @@ Step 3: TTS (Text-to-Speech) Generator
 This script generates audio files from news_scripts.json using OpenAI TTS
 
 python step3_tts_generator.py # will regenerate audio files
-python step3_tts_generator.py --combine-only # will skip regeneration of audio files
+python step3_tts_generator.py --update-manifest # will only update manifest from existing audio files
 """
 
 import os
@@ -122,16 +122,15 @@ def preprocess_script_for_tts(script_text, language, use_replacements=USE_REPLAC
 
 def generate_audio_with_google_tts(segment, output_dir):
     """Generate audio file using Google Cloud Text-to-Speech"""
-    print(f"Generating audio with Google TTS for: {segment['display_name']}")
+    print(f"Generating audio with Google TTS for: {segment['segment_index']}")
     print(f"Language: {LANGUAGE}")
     print(f"Script length: {len(segment['script'])} characters")
     
     # Create audio output directory
     os.makedirs(output_dir, exist_ok=True)
     
-    # Output filename - use unique identifier to avoid overwriting
-    segment_id = f"{segment['segment_type']}_{segment.get('display_order', 0)}"
-    audio_filename = f"{segment_id}.{TTS_CONFIG['output_format']}"
+    # Output filename - use segment_index
+    audio_filename = f"{segment['segment_index']}.{TTS_CONFIG['output_format']}"
     audio_path = os.path.join(output_dir, audio_filename)
     
     try:
@@ -176,14 +175,14 @@ def generate_audio_with_google_tts(segment, output_dir):
         try:
             audio_segment = AudioSegment.from_file(audio_path)
             actual_duration = len(audio_segment) / 1000.0  # Convert to seconds
-            print(f"Measured actual duration: {actual_duration:.3f}s (estimated: {segment['duration']}s)")
+            print(f"Measured actual duration: {actual_duration:.3f}s (estimated: {segment.get('duration', 0)}s)")
         except Exception as e:
             print(f"Warning: Could not measure audio duration: {e}")
-            actual_duration = segment["duration"]  # Fallback to estimated
+            actual_duration = segment.get("duration", 0)  # Fallback to 0 if not present
         
         return {
             "segment_type": segment["segment_type"],
-            "display_name": segment["display_name"],
+            "segment_index": segment["segment_index"],
             "audio_file": audio_filename,
             "audio_path": audio_path,
             "script": segment["script"],
@@ -199,24 +198,21 @@ def generate_audio_with_google_tts(segment, output_dir):
 
 def generate_audio_with_openai_tts(segment, output_dir):
     """Generate audio file using OpenAI Text-to-Speech"""
-    print(f"Generating audio with OpenAI TTS for: {segment['display_name']}")
+    print(f"Generating audio with OpenAI TTS for: {segment['segment_index']}")
     print(f"Language: {LANGUAGE}")
     print(f"Script length: {len(segment['script'])} characters")
     
     # Create audio output directory
     os.makedirs(output_dir, exist_ok=True)
     
-    # Output filename - use unique identifier to avoid overwriting
-    segment_id = f"{segment['segment_type']}_{segment.get('display_order', 0)}"
-    audio_filename = f"{segment_id}.{TTS_CONFIG['output_format']}"
+    # Output filename - use segment_index
+    audio_filename = f"{segment['segment_index']}.{TTS_CONFIG['output_format']}"
     audio_path = os.path.join(output_dir, audio_filename)
     
     try:
         # Select appropriate voice for language
         voice = TTS_CONFIG["voice"]
         if LANGUAGE.lower() == "filipino":
-            # Use alloy voice which works well with Filipino
-            # OpenAI TTS doesn't have specific Filipino voices yet, but alloy handles it reasonably
             voice = "alloy"
             print(f"Using voice '{voice}' for Filipino language")
         
@@ -242,14 +238,14 @@ def generate_audio_with_openai_tts(segment, output_dir):
         try:
             audio_segment = AudioSegment.from_file(audio_path)
             actual_duration = len(audio_segment) / 1000.0  # Convert to seconds
-            print(f"Measured actual duration: {actual_duration:.3f}s (estimated: {segment['duration']}s)")
+            print(f"Measured actual duration: {actual_duration:.3f}s (estimated: {segment.get('duration', 0)}s)")
         except Exception as e:
             print(f"Warning: Could not measure audio duration: {e}")
-            actual_duration = segment["duration"]  # Fallback to estimated
+            actual_duration = segment.get("duration", 0)  # Fallback to 0 if not present
         
         return {
             "segment_type": segment["segment_type"],
-            "display_name": segment["display_name"],
+            "segment_index": segment["segment_index"],
             "audio_file": audio_filename,
             "audio_path": audio_path,
             "script": segment["script"],
@@ -265,16 +261,15 @@ def generate_audio_with_openai_tts(segment, output_dir):
 
 def generate_audio_with_elevenlabs_tts(segment, output_dir):
     """Generate audio file using ElevenLabs Text-to-Speech"""
-    print(f"Generating audio with ElevenLabs TTS for: {segment['display_name']}")
+    print(f"Generating audio with ElevenLabs TTS for: {segment['segment_index']}")
     print(f"Language: {LANGUAGE}")
     print(f"Script length: {len(segment['script'])} characters")
     
     # Create audio output directory
     os.makedirs(output_dir, exist_ok=True)
     
-    # Output filename (ElevenLabs returns mp3) - use unique identifier to avoid overwriting
-    segment_id = f"{segment['segment_type']}_{segment.get('display_order', 0)}"
-    audio_filename = f"{segment_id}.mp3"
+    # Output filename (ElevenLabs returns mp3) - use segment_index
+    audio_filename = f"{segment['segment_index']}.mp3"
     audio_path = os.path.join(output_dir, audio_filename)
     
     try:
@@ -312,7 +307,6 @@ def generate_audio_with_elevenlabs_tts(segment, output_dir):
         
         # Save audio file
         with open(audio_path, "wb") as f:
-            # audio_data is a generator, so we need to iterate through it
             for chunk in audio_data:
                 f.write(chunk)
         
@@ -322,14 +316,14 @@ def generate_audio_with_elevenlabs_tts(segment, output_dir):
         try:
             audio_segment = AudioSegment.from_file(audio_path)
             actual_duration = len(audio_segment) / 1000.0  # Convert to seconds
-            print(f"Measured actual duration: {actual_duration:.3f}s (estimated: {segment['duration']}s)")
+            print(f"Measured actual duration: {actual_duration:.3f}s (estimated: {segment.get('duration', 0)}s)")
         except Exception as e:
             print(f"Warning: Could not measure audio duration: {e}")
-            actual_duration = segment["duration"]  # Fallback to estimated
+            actual_duration = segment.get("duration", 0)  # Fallback to 0 if not present
         
         return {
             "segment_type": segment["segment_type"],
-            "display_name": segment["display_name"],
+            "segment_index": segment["segment_index"],
             "audio_file": audio_filename,
             "audio_path": audio_path,
             "script": segment["script"],
@@ -352,106 +346,44 @@ def generate_audio_from_script(segment, output_dir):
     else:
         return generate_audio_with_openai_tts(segment, output_dir)
 
-def combine_audio_segments(audio_results, output_dir):
-    """Combine all audio segments into a single combined.mp3 file"""
-    print("\n=== Combining Audio Segments ===")
-    
-    if not audio_results:
-        print("No audio files to combine!")
-        return None
-    
-    # Load the original scripts to get display_order
-    scripts = load_news_scripts()
-    if not scripts:
-        print("Error: Could not load scripts to determine display order!")
-        return None
-    
-    # Create a mapping of segment_type to display_order
-    display_order_map = {}
-    for script in scripts:
-        display_order_map[script['segment_type']] = script.get('display_order', 999)
-    
-    # Sort audio results by display_order using the mapping
-    segment_order = []
-    for result in audio_results:
-        segment_type = result['segment_type']
-        display_order = display_order_map.get(segment_type, 999)
-        segment_order.append((display_order, result))
-        print(f"  Found segment: {segment_type} with display_order: {display_order}")
-    
-    # Sort by display_order
-    segment_order.sort(key=lambda x: x[0])
-    
-    print(f"Segments will be combined in this order:")
-    for order, result in segment_order:
-        print(f"  {order}: {result['display_name']} ({result['segment_type']})")
-    
-    try:
-        combined_audio = AudioSegment.empty()
-        total_duration = 0
-        
-        print("Combining segments in order:")
-        for order, result in segment_order:
-            audio_path = result['audio_path']
-            display_name = result['display_name']
-            
-            if os.path.exists(audio_path):
-                print(f"  {order}: {display_name} - {audio_path}")
-                
-                # Load audio segment
-                audio_segment = AudioSegment.from_mp3(audio_path)
-                
-                # Add a small pause between segments (1 second)
-                if len(combined_audio) > 0:
-                    pause = AudioSegment.silent(duration=1000)  # 1 second pause
-                    combined_audio += pause
-                
-                # Add the audio segment
-                combined_audio += audio_segment
-                total_duration += len(audio_segment) / 1000.0  # Convert to seconds
-                
-            else:
-                print(f"  WARNING: Audio file not found: {audio_path}")
-        
-        # Export combined audio
-        combined_path = os.path.join(output_dir, "combined.mp3")
-        combined_audio.export(combined_path, format="mp3")
-        
-        # Measure actual combined duration
-        actual_combined_duration = len(combined_audio) / 1000.0  # Convert to seconds
-        
-        print(f"\n✅ Combined audio created: {combined_path}")
-        print(f"📊 Measured combined duration: {actual_combined_duration:.3f} seconds ({actual_combined_duration/60:.2f} minutes)")
-        print(f"📊 Sum of segments: {total_duration:.3f} seconds (difference: {actual_combined_duration - total_duration:.3f}s)")
-        print(f"🎵 Total segments: {len(segment_order)}")
-        
-        return {
-            "combined_file": "combined.mp3",
-            "combined_path": combined_path,
-            "total_duration": round(actual_combined_duration, 3),
-            "segment_count": len(segment_order),
-            "segments_included": [result['display_name'] for _, result in segment_order]
-        }
-        
-    except Exception as e:
-        print(f"❌ Error combining audio segments: {e}")
-        return None
+def update_manifest_from_audio(scripts, audio_dir):
+    """Update manifest based on existing audio files and measured durations."""
+    from pydub import AudioSegment
+    individual_segments = []
+    for i, segment in enumerate(scripts):
+        audio_filename = f"{segment['segment_index']}.mp3"
+        audio_path = os.path.join(audio_dir, audio_filename)
+        if os.path.exists(audio_path):
+            try:
+                audio_segment = AudioSegment.from_file(audio_path)
+                actual_duration = len(audio_segment) / 1000.0
+            except Exception as e:
+                print(f"Warning: Could not measure audio duration: {e}")
+                actual_duration = 0
+            individual_segments.append({
+                "segment_type": segment["segment_type"],
+                "segment_index": segment["segment_index"],
+                "audio_path": audio_path,
+                "script": segment["script"],
+                "duration": round(actual_duration, 3)
+            })
+        else:
+            print(f"  ❌ Missing: {audio_filename}")
+    return individual_segments
 
 def main():
-    """Main function to generate TTS audio"""
+    """Main function to generate TTS audio or update manifest only"""
     import sys
     
-    # Check for combine-only flag
-    combine_only = "--combine-only" in sys.argv or "-c" in sys.argv
+    update_manifest_only = "--update-manifest" in sys.argv
     
     print("=== Nexcaster News TTS Generator ===")
-    if combine_only:
-        print("Step 3: Combining existing audio files (SKIP GENERATION)")
+    if update_manifest_only:
+        print("Step 3: Updating manifest from existing audio files (NO GENERATION)")
     else:
-        print("Step 3: Generating audio from news scripts")
+        print("Step 3: Generating audio from news scripts if missing, then updating manifest")
     print(f"TTS Service: {TTS_USE}")
     print(f"Language: {LANGUAGE}")
-    
     if TTS_USE.upper() == "GOOGLE":
         print(f"Voice: {TTS_CONFIG['voice_name']}")
         print(f"Language Code: {TTS_CONFIG['language_code']}")
@@ -462,7 +394,6 @@ def main():
         print(f"Similarity Boost: {TTS_CONFIG['voice_settings']['similarity_boost']}")
     else:
         print(f"Voice: {TTS_CONFIG['voice']}")
-    
     if TTS_USE.upper() == "ELEVENLABS":
         print(f"Output format: mp3")
     else:
@@ -476,115 +407,51 @@ def main():
     
     # Create audio output directory
     audio_dir = os.path.join('generated', 'audio')
+    os.makedirs(audio_dir, exist_ok=True)
+
+    # Empty the audio output directory if not just updating manifest
+    if not update_manifest_only:
+        print(f"Clearing audio output directory: {audio_dir}")
+        for filename in os.listdir(audio_dir):
+            file_path = os.path.join(audio_dir, filename)
+            try:
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.remove(file_path)
+                    print(f"  Deleted: {file_path}")
+                elif os.path.isdir(file_path):
+                    import shutil
+                    shutil.rmtree(file_path)
+                    print(f"  Deleted directory: {file_path}")
+            except Exception as e:
+                print(f"  Failed to delete {file_path}: {e}")
     
-    # Generate audio for each segment (or skip if combine-only)
     audio_results = []
-    if combine_only:
-        print("🔄 Skipping generation - looking for existing audio files...")
-        # Create audio_results from existing files
-        for segment in scripts:
-            segment_id = f"{segment['segment_type']}_{segment.get('display_order', 0)}"
-            audio_filename = f"{segment_id}.mp3"
-            audio_path = os.path.join(audio_dir, audio_filename)
-            
-            if os.path.exists(audio_path):
-                print(f"  ✅ Found: {audio_filename}")
-                
-                # Measure actual duration of existing audio file
-                try:
-                    audio_segment = AudioSegment.from_file(audio_path)
-                    actual_duration = len(audio_segment) / 1000.0  # Convert to seconds
-                    print(f"    📏 Measured duration: {actual_duration:.3f}s (estimated was: {segment.get('duration', 0)}s)")
-                except Exception as e:
-                    print(f"    ⚠️  Warning: Could not measure audio duration: {e}")
-                    actual_duration = segment.get("duration", 0)  # Fallback to estimated
-                
-                audio_results.append({
-                    "segment_type": segment["segment_type"],
-                    "display_name": segment["display_name"],
-                    "audio_file": audio_filename,
-                    "audio_path": audio_path,
-                    "script": segment["script"],
-                    "duration": round(actual_duration, 3),
-                    "language": LANGUAGE,
-                    "voice_used": TTS_CONFIG.get("voice_id", "ElevenLabs"),
-                    "tts_service": "ElevenLabs"
-                })
-            else:
-                print(f"  ❌ Missing: {audio_filename}")
+    if update_manifest_only:
+        print("🔄 Only updating manifest from existing audio files...")
+        audio_results = update_manifest_from_audio(scripts, audio_dir)
     else:
         for segment in scripts:
-            result = generate_audio_from_script(segment, audio_dir)
-            if result:
-                audio_results.append(result)
+            audio_filename = f"{segment['segment_index']}.mp3"
+            audio_path = os.path.join(audio_dir, audio_filename)
+            if os.path.exists(audio_path):
+                print(f"  ✅ Found: {audio_filename}")
+            else:
+                result = generate_audio_from_script(segment, audio_dir)
+                if result:
+                    print(f"  ✅ Generated: {audio_filename}")
+        # After generation, always update manifest from audio files
+        audio_results = update_manifest_from_audio(scripts, audio_dir)
     
-    # Combine all audio segments into one file
-    combined_result = combine_audio_segments(audio_results, audio_dir)
-    
-    # Calculate start and end times for each segment
-    cumulative_time = 0
-    updated_audio_results = []
-    
-    print("\n=== Calculating Segment Timing (with 1s pauses) ===")
-    for i, result in enumerate(audio_results):
-        start_time = cumulative_time
-        end_time = start_time + result['duration']
-        
-        # Add timing information to the segment
-        updated_result = result.copy()
-        updated_result['start_time'] = round(start_time, 3)
-        updated_result['end_time'] = round(end_time, 3)
-        
-        print(f"  {result['display_name']}: {start_time:.3f}s - {end_time:.3f}s (duration: {result['duration']:.3f}s)")
-        
-        updated_audio_results.append(updated_result)
-        cumulative_time = end_time
-        
-        # Add 1-second pause after each segment (except the last one)
-        if i < len(audio_results) - 1:
-            cumulative_time += 1.0  # Add 1-second pause
-            print(f"    + 1.0s pause → next starts at {cumulative_time:.3f}s")
-    
-    print(f"Total manifest duration with pauses: {cumulative_time:.3f}s ({cumulative_time/60:.2f} minutes)")
-    if combined_result:
-        print(f"Combined audio duration: {combined_result['total_duration']:.3f}s")
-        print(f"Timing match: {abs(cumulative_time - combined_result['total_duration']):.3f}s difference")
-    
-    # Update metadata to include combined file info and timing
-    final_metadata = {
-        "individual_segments": updated_audio_results,
-        "combined_audio": combined_result,
-        "generation_info": {
-            "tts_service": TTS_USE,
-            "language": LANGUAGE,
-            "total_segments": len(updated_audio_results),
-            "total_duration": round(cumulative_time, 3),
-            "timestamp": datetime.now().isoformat()
-        }
-    }
-    
-    # Save audio metadata
+    # Save audio metadata (manifest)
     news_manifest_path = os.path.join('generated', 'news_manifest.json')
     with open(news_manifest_path, 'w', encoding='utf-8') as f:
-        json.dump(final_metadata, f, indent=2, ensure_ascii=False)
-    
-    print(f"\n🎯 Audio generation complete!")
-    print(f"Generated {len(updated_audio_results)} individual audio files in {LANGUAGE}")
-    print(f"Audio files saved in: {audio_dir}")
+        json.dump(audio_results, f, indent=2, ensure_ascii=False)
+    print(f"\n🎯 Manifest updated!")
     print(f"Manifest saved to: {news_manifest_path}")
-    
-    if combined_result:
-        print(f"\n🎵 Combined Audio:")
-        print(f"  File: {combined_result['combined_file']}")
-        print(f"  Duration: {combined_result['total_duration']:.1f}s ({combined_result['total_duration']/60:.1f} minutes)")
-        print(f"  Segments: {combined_result['segment_count']}")
-    
-    # Display summary of generated files with timing
+    print(f"Total segments: {len(audio_results)}")
     print(f"\n📁 Generated audio segments with timing:")
-    for result in updated_audio_results:
-        service_info = f"({result['tts_service']}: {result['voice_used']})"
-        timing_info = f"[{result['start_time']:.1f}s - {result['end_time']:.1f}s]"
-        print(f"  - {result['display_name']}: {result['audio_file']} {timing_info} {service_info}")
+    for result in audio_results:
+        print(f"  - {result['segment_index']}: {result['audio_path']} (duration: {result['duration']:.2f}s)")
 
 if __name__ == "__main__":
     main()

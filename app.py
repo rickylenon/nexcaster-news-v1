@@ -63,13 +63,7 @@ def upload_news():
     # Handle uploaded files
     media_files = []
     files = request.files.getlist('media_files')
-    upload_results = {
-        'successful_uploads': 0,
-        'failed_uploads': 0,
-        'images': 0,
-        'videos': 0,
-        'failed_files': []
-    }
+    # Removed upload_results and related tracking
     
     print(f"Processing {len(files)} uploaded files...")
     
@@ -79,8 +73,6 @@ def upload_news():
             
             # Check file extension
             if not allowed_file(file.filename):
-                upload_results['failed_uploads'] += 1
-                upload_results['failed_files'].append(f"{file.filename} (unsupported format)")
                 print(f"Skipped unsupported file: {file.filename}")
                 continue
             
@@ -90,8 +82,6 @@ def upload_news():
             file.seek(0)  # Reset to beginning
             
             if file_size > 50 * 1024 * 1024:  # 50MB limit per file
-                upload_results['failed_uploads'] += 1
-                upload_results['failed_files'].append(f"{file.filename} (file too large)")
                 print(f"Skipped large file: {file.filename} ({file_size / (1024*1024):.1f}MB)")
                 continue
             
@@ -104,35 +94,22 @@ def upload_news():
                 # Save file
                 file.save(file_path)
                 
-                # Determine media type and get file info
+                # Determine media type
                 ext = filename.rsplit('.', 1)[1].lower()
-                file_info = {
-                    "original_name": filename,
-                    "size": file_size,
-                    "size_mb": round(file_size / (1024*1024), 2)
-                }
                 
                 if ext in {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}:
                     media_files.append({
-                        "image": unique_filename,
-                        **file_info
+                        "image": unique_filename
                     })
-                    upload_results['images'] += 1
-                    print(f"Saved image: {unique_filename} ({file_info['size_mb']}MB)")
+                    print(f"Saved image: {unique_filename}")
                     
                 elif ext in {'mp4', 'avi', 'mov', 'webm', 'mkv', 'flv'}:
                     media_files.append({
-                        "video": unique_filename,
-                        **file_info
+                        "video": unique_filename
                     })
-                    upload_results['videos'] += 1
-                    print(f"Saved video: {unique_filename} ({file_info['size_mb']}MB)")
-                
-                upload_results['successful_uploads'] += 1
+                    print(f"Saved video: {unique_filename}")
                 
             except Exception as e:
-                upload_results['failed_uploads'] += 1
-                upload_results['failed_files'].append(f"{file.filename} (upload error)")
                 print(f"Error uploading {file.filename}: {e}")
     
     # Handle links
@@ -146,8 +123,7 @@ def upload_news():
     news_item = {
         "news": news_context,
         "media": media_files,
-        "timestamp": datetime.now().isoformat(),
-        "upload_summary": upload_results
+        "timestamp": datetime.now().isoformat()
     }
     
     # Load existing data and append new item
@@ -156,19 +132,7 @@ def upload_news():
     save_news_data(news_data)
     
     # Generate success/error messages
-    if upload_results['successful_uploads'] > 0:
-        success_msg = f"News item uploaded successfully! "
-        success_msg += f"Processed {upload_results['successful_uploads']} files: "
-        success_msg += f"{upload_results['images']} images, {upload_results['videos']} videos"
-        flash(success_msg, 'success')
-        print(f"Upload successful: {success_msg}")
-    
-    if upload_results['failed_uploads'] > 0:
-        error_msg = f"Failed to upload {upload_results['failed_uploads']} files: "
-        error_msg += ", ".join(upload_results['failed_files'])
-        flash(error_msg, 'error')
-        print(f"Upload errors: {error_msg}")
-    
+    flash("News item uploaded!", 'success')
     print(f"News item added successfully. Total items: {len(news_data)}")
     return redirect(url_for('index'))
 
@@ -291,21 +255,14 @@ def update_news(index):
                         
                         # Add to media list
                         ext = filename.rsplit('.', 1)[1].lower()
-                        file_info = {
-                            "original_name": filename,
-                            "size": file_size,
-                            "size_mb": round(file_size / (1024*1024), 2)
-                        }
                         
                         if ext in {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}:
                             existing_media.append({
-                                "image": unique_filename,
-                                **file_info
+                                "image": unique_filename
                             })
                         elif ext in {'mp4', 'avi', 'mov', 'webm', 'mkv', 'flv'}:
                             existing_media.append({
-                                "video": unique_filename,
-                                **file_info
+                                "video": unique_filename
                             })
                         
                         print(f"Added new media file: {unique_filename}")
@@ -412,62 +369,28 @@ def get_news_manifest():
         if os.path.exists(manifest_path):
             with open(manifest_path, 'r', encoding='utf-8') as f:
                 manifest = json.load(f)
-            
-            # Check for anchor videos and add them to segments
+            # Anchor video logic (optional, keep if needed)
             anchor_dir = os.path.join(GENERATED_FOLDER, 'anchor')
             anchor_videos = {}
             if os.path.exists(anchor_dir):
                 for filename in os.listdir(anchor_dir):
                     if filename.endswith('.mp4'):
-                        # Extract base name without extension
-                        base_name = filename[:-4]  # Remove .mp4
+                        base_name = filename[:-4]
                         anchor_videos[base_name] = {
                             'video': filename,
                             'path': f'/generated/anchor/{filename}',
                             'type': 'anchor_video'
                         }
-            
-            # Add anchor videos to segments
-            segments = manifest.get('individual_segments', [])
-            for segment in segments:
-                audio_file = segment.get('audio_file', '')
-                if audio_file:
-                    # Remove .mp3 extension to match anchor video names
-                    base_audio_name = audio_file[:-4] if audio_file.endswith('.mp3') else audio_file
-                    if base_audio_name in anchor_videos:
-                        # Add anchor video to segment media
-                        if 'media' not in segment:
-                            segment['media'] = []
-                        segment['media'].append(anchor_videos[base_audio_name])
-                        print(f"✅ Added anchor video for segment: {segment.get('display_name', 'Unknown')}")
-            
-            # Add API metadata
-            manifest['api_metadata'] = {
-                'served_at': datetime.now().isoformat(),
-                'server': 'Nexcaster News API v1.0',
-                'endpoint': '/api/news/manifest',
-                'anchor_videos_found': len(anchor_videos)
-            }
-            
-            segment_types = {}
-            for segment in segments:
-                segment_type = segment.get('segment_type', 'unknown')
-                if segment_type == 'headline_opening':
-                    segment_types['headline_opening'] = segment_types.get('headline_opening', 0) + 1
-                elif segment_type == 'headline':
-                    segment_types['headlines'] = segment_types.get('headlines', 0) + 1
-                elif segment_type == 'news':
-                    segment_types['news_stories'] = segment_types.get('news_stories', 0) + 1
-                elif segment_type in ['opening_greeting', 'closing_remarks']:
-                    segment_types['greetings'] = segment_types.get('greetings', 0) + 1
-                else:
-                    segment_types['other'] = segment_types.get('other', 0) + 1
-            
-            print(f"✅ Served news manifest with {len(segments)} segments:")
-            for segment_type, count in segment_types.items():
-                print(f"   - {segment_type}: {count}")
-            print(f"🎬 Found {len(anchor_videos)} anchor videos")
-            
+            # Add anchor videos to segments (if audio_path matches base_name)
+            for segment in manifest:
+                audio_path = segment.get('audio_path', '')
+                base_audio_name = os.path.basename(audio_path)[:-4] if audio_path.endswith('.mp3') else os.path.basename(audio_path)
+                if base_audio_name in anchor_videos:
+                    if 'media' not in segment:
+                        segment['media'] = []
+                    segment['media'].append(anchor_videos[base_audio_name])
+                    print(f"✅ Added anchor video for segment: {segment.get('display_name', 'Unknown')}")
+            print(f"✅ Served news manifest with {len(manifest)} segments.")
             return jsonify(manifest)
         else:
             print("❌ News manifest not found")
