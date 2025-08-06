@@ -345,10 +345,6 @@
                         cumulativeTime = endTime;
                     }
                     
-                    // Check for outro audio and add it as last segment if it exists
-                    const outroDuration = await this.checkAndAddOutroSegment(cumulativeTime);
-                    cumulativeTime += outroDuration;
-                    
                     // Calculate total duration
                     this.totalDuration = cumulativeTime || this.manifest.combined_audio.total_duration;
                     
@@ -388,43 +384,6 @@
                         bgVolumeGroup.title = 'Background music not available';
                     }
                 }
-            }
-            
-            async checkAndAddOutroSegment(startTime) {
-                try {
-                    const response = await fetch('/media/outro.mp3', { method: 'HEAD' });
-                    if (response.ok) {
-                        // Create a fake audio element to get duration
-                        const audio = new Audio('/media/outro.mp3');
-                        await new Promise((resolve) => {
-                            audio.addEventListener('loadedmetadata', resolve);
-                        });
-                        
-                        const outroDuration = audio.duration;
-                        this.log('info', `Found outro audio: ${this.formatTime(outroDuration)} duration`);
-                        
-                        // Add outro as last segment
-                        this.segments.push({
-                            name: 'outro',
-                            display_name: 'News Outro',
-                            script: 'Thank you for watching Nexcaster News. Stay informed, stay connected.',
-                            start_time: startTime,
-                            end_time: startTime + outroDuration,
-                            duration: outroDuration,
-                            audio_file: 'outro.mp3',
-                            audio_path: '/media/outro.mp3',
-                            media: [],
-                            voice_used: 'outro',
-                            language: 'en',
-                            _isOutro: true
-                        });
-                        
-                        return outroDuration;
-                    }
-                } catch (error) {
-                    this.log('info', 'Outro audio not found - continuing without outro');
-                }
-                return 0;
             }
             
             setupAudioElements() {
@@ -708,6 +667,14 @@
             }
             
             async displaySegmentMediaForActiveSegment(segment) {
+                // Special handling for outro: hide all media and overlay
+                if (segment._isOutro) {
+                    this.log('info', '[OUTRO] Hiding all media and overlay video for outro segment');
+                    this.mainVideo.style.display = 'none';
+                    this.mainImage.style.display = 'none';
+                    this.overlayVideo.style.display = 'none';
+                    return;
+                }
                 // Handle media display with detailed logging
                 if (segment.media && segment.media.length > 0) {
                     this.log('info', `🖼️ Processing ${segment.media.length} media items for "${this.getSegmentDisplayName(segment)}"`);

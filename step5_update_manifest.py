@@ -240,6 +240,32 @@ def save_updated_manifest(segments):
         json.dump(segments, f, indent=2, ensure_ascii=False)
     print(f"\n✅ Updated manifest saved to: {manifest_path}")
 
+# --- Add this function to handle outro segment ---
+def ensure_outro_segment(segments):
+    """Remove any existing outro segment and append a new one at the end."""
+    # Remove all outro segments
+    filtered = [seg for seg in segments if seg.get('segment_type') != 'outro']
+    print(f"[OUTRO] Removed {len(segments) - len(filtered)} existing outro segment(s)")
+    # Add new outro segment
+    outro_segment = {
+        "segment_type": "outro",
+        "segment_index": "outro_1",
+        "audio_path": "media/outro.mp3",
+        "script": "",
+        "duration": 5,
+        "media": [
+            {
+                "video": "outro.mp4",
+                "path": "media/outro.mp4",
+                "type": "outro_video"
+            }
+        ],
+        "anchor_video": ""
+    }
+    filtered.append(outro_segment)
+    print(f"[OUTRO] Appended new outro segment at the end of manifest.")
+    return filtered
+
 def print_media_summary(segments):
     """Print summary of media assignments"""
     print(f"\n📊 Media Assignment Summary:")
@@ -320,6 +346,8 @@ def main():
         weather_segments = load_weather_segments()
         updated_segments = insert_weather_segments(updated_segments, weather_segments)
         print("[INFO] Weather segments inserted into manifest.")
+    # Ensure outro segment is always last and unique
+    updated_segments = ensure_outro_segment(updated_segments)
     save_updated_manifest(updated_segments)
     print_media_summary(updated_segments)
     print(f"\n🎯 Media mapping complete!")
